@@ -2,7 +2,6 @@
 
 import { ReactNode } from "react";
 import Link from "next/link";
-import { Fingerprint } from "lucide-react";
 
 type AuthLayoutProps = {
   children: ReactNode;
