@@ -1,4 +1,4 @@
-
+'use client'
 import { requireUser } from "@/src/lib/auth-guards";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
