@@ -6,13 +6,13 @@
   PortfolioPoint,
   SpendingCategory,
   Transaction,
+  WalletAccount,
 } from "@/components/dashboard/types";
 
 export const dashboardNavItems: NavItem[] = [
-  { id: "dashboard", label: "Painel", href: "/dashboard", isActive: true },
-  { id: "wallet", label: "Carteira", href: "/dashboard?section=wallet" },
-  { id: "planner", label: "Planejamento", href: "/dashboard?section=planner" },
-  { id: "vault", label: "Cofre", href: "/dashboard?section=vault" },
+  { id: "dashboard", label: "Painel", href: "/dashboard" },
+  { id: "expenses", label: "Transações", href: "/transacoes" },
+  { id: "wallet", label: "Carteira", href: "/carteira" },
   {
     id: "settings",
     label: "Configurações",
@@ -98,6 +98,30 @@ export const activeCards: CardSummary[] = [
     cardHolder: "Alex Morgan",
     expires: "09/25",
     theme: "light",
+  },
+];
+
+export const walletAccounts: WalletAccount[] = [
+  {
+    id: "black",
+    name: "Aureum Black",
+    balance: 42850,
+    kindLabel: "Saldo",
+    accent: "dark",
+  },
+  {
+    id: "platinum",
+    name: "Platinum Elite",
+    balance: 12400,
+    kindLabel: "Saldo",
+    accent: "light",
+  },
+  {
+    id: "investment",
+    name: "Investment",
+    balance: 158000,
+    kindLabel: "Saldo",
+    accent: "light",
   },
 ];
 

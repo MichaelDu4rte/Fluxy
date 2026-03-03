@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import LogoutButton from "@/app/(app)/dashboard/LogoutButton";
-import type { NavItem } from "@/components/dashboard/types";
+import type { NavItem, NavItemId } from "@/components/dashboard/types";
 import { cn } from "@/lib/utils";
 import {
+  ArrowLeftRight,
   LayoutDashboard,
   Lock,
   Plus,
@@ -12,17 +13,20 @@ import {
   Waypoints,
 } from "lucide-react";
 import Link from "next/link";
+import type { ComponentType } from "react";
 
 type DashboardSidebarProps = {
   userName: string;
   userEmail: string;
   items: NavItem[];
+  activeNavId: NavItemId;
   className?: string;
   onNavigate?: () => void;
 };
 
-const iconMap = {
+const iconMap: Record<NavItemId, ComponentType<{ className?: string }>> = {
   dashboard: LayoutDashboard,
+  expenses: ArrowLeftRight,
   wallet: Wallet,
   planner: Waypoints,
   vault: Lock,
@@ -33,6 +37,7 @@ export default function DashboardSidebar({
   userName,
   userEmail,
   items,
+  activeNavId,
   className,
   onNavigate,
 }: DashboardSidebarProps) {
@@ -62,6 +67,7 @@ export default function DashboardSidebar({
         <nav className="space-y-2" aria-label="Navegação lateral">
           {items.map((item) => {
             const Icon = iconMap[item.id];
+            const isActive = item.id === activeNavId;
 
             return (
               <Link
@@ -70,7 +76,7 @@ export default function DashboardSidebar({
                 onClick={onNavigate}
                 className={cn(
                   "flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-medium transition-colors",
-                  item.isActive
+                  isActive
                     ? "bg-[#e5e1d8]/65 text-[#b38c19]"
                     : "text-[#171611] hover:bg-[#ebe8de]/70",
                 )}

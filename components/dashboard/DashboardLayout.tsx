@@ -1,20 +1,24 @@
-"use client";
+﻿"use client";
 
 import { dashboardNavItems } from "@/components/dashboard/dashboard-mock-data";
-import DashboardMain from "@/components/dashboard/DashboardMain";
+import type { NavItemId } from "@/components/dashboard/types";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Menu, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type DashboardLayoutProps = {
   userName: string;
   userEmail: string;
+  activeNavId: NavItemId;
+  children: ReactNode;
 };
 
 export default function DashboardLayout({
   userName,
   userEmail,
+  activeNavId,
+  children,
 }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const prefersReducedMotion = useReducedMotion();
@@ -43,7 +47,7 @@ export default function DashboardLayout({
           <Menu className="h-5 w-5" />
         </button>
 
-        <div className="text-sm font-semibold tracking-[0.2em] uppercase text-[#877e64]">
+        <div className="text-sm font-semibold uppercase tracking-[0.2em] text-[#877e64]">
           Fluxy
         </div>
 
@@ -54,6 +58,7 @@ export default function DashboardLayout({
         <DashboardSidebar
           userName={userName}
           userEmail={userEmail}
+          activeNavId={activeNavId}
           items={dashboardNavItems}
           className="h-full"
         />
@@ -92,6 +97,7 @@ export default function DashboardLayout({
               <DashboardSidebar
                 userName={userName}
                 userEmail={userEmail}
+                activeNavId={activeNavId}
                 items={dashboardNavItems}
                 onNavigate={() => setSidebarOpen(false)}
                 className="h-full"
@@ -101,9 +107,7 @@ export default function DashboardLayout({
         ) : null}
       </AnimatePresence>
 
-      <div className="min-w-0 md:ml-[304px]">
-        <DashboardMain />
-      </div>
+      <div className="min-w-0 md:ml-[304px]">{children}</div>
     </div>
   );
 }

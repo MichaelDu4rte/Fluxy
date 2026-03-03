@@ -1,13 +1,14 @@
 ﻿"use client";
 
-import {
-  activeCards,
-  kpiCards,
-  portfolioPoints,
-  recentTransactions,
-  spendingCategories,
-} from "@/components/dashboard/dashboard-mock-data";
-import type { SpendingCategory } from "@/components/dashboard/types";
+import type { ExpenseCategory } from "@/components/expenses/types";
+import { expenseCategoryLabels } from "@/components/expenses/expense-mock-data";
+import type {
+  CardSummary,
+  KpiCard,
+  SpendingCategory,
+  Transaction,
+  TransactionIcon,
+} from "@/components/dashboard/types";
 import ActiveCardsPanel from "@/components/dashboard/sections/ActiveCardsPanel";
 import KpiRow from "@/components/dashboard/sections/KpiRow";
 import PortfolioChartCard from "@/components/dashboard/sections/PortfolioChartCard";
@@ -20,21 +21,269 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { readCookieJson, writeCookieJson } from "@/src/lib/client-cookies";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
-import { useMemo, useState } from "react";
+import { CalendarRange, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 const enterEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-type PeriodFilter = "this-month" | "last-3-months" | "last-12-months";
 type CardFilter = "all" | string;
 type TagFilter = "all" | string;
 
-const periodOptions: Array<{ value: PeriodFilter; label: string; maxAgeInMonths: number }> = [
-  { value: "this-month", label: "Este mês", maxAgeInMonths: 0 },
-  { value: "last-3-months", label: "Últimos 3 meses", maxAgeInMonths: 2 },
-  { value: "last-12-months", label: "Últimos 12 meses", maxAgeInMonths: 11 },
-];
+const DASHBOARD_FILTERS_COOKIE = "fluxy_dashboard_filters_v1";
+
+type ApiFinancialAccountType = "credit" | "debit" | "investment";
+type ApiTransactionKind = "expense" | "income";
+
+type ApiCardDto = {
+  id: string;
+  name: string;
+  type: ApiFinancialAccountType;
+  last4Digits: string | null;
+  creditLimitCents: number | null;
+  initialBalanceCents: number;
+  isActive: boolean;
+  metrics: {
+    availableCents: number;
+    incomeTotalCents: number;
+    expenseTotalCents: number;
+    creditUsedCents: number;
+    utilizationPct: number;
+  };
+};
+
+type ApiTransactionDto = {
+  id: string;
+  accountId: string;
+  kind: ApiTransactionKind;
+  category: string;
+  merchant: string;
+  amountCents: number;
+  occurredAt: string;
+};
+
+type ApiErrorResponse = {
+  error?: {
+    code?: string;
+    message?: string;
+  };
+};
+
+type DashboardTransaction = Transaction & {
+  amountValue: number;
+  kind: ApiTransactionKind;
+  occurredAtISO: string;
+  occurredDateISO: string;
+};
+
+class ApiRequestError extends Error {
+  public readonly status: number;
+  public readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+const categoryColorMap: Record<string, string> = {
+  alimentacao: "#787F5B",
+  transporte: "#8A816F",
+  moradia: "#B38C19",
+  assinaturas: "#6E7A96",
+  lazer: "#B36F4F",
+  saude: "#638B7A",
+  educacao: "#8B6E9C",
+  outros: "#A38E6A",
+};
+
+function formatCurrencyFromCents(cents: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+}
+
+function formatCurrencyWithDecimalsFromCents(cents: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+}
+
+function formatDateLabel(occurredAtISO: string) {
+  const date = new Date(occurredAtISO);
+  if (Number.isNaN(date.getTime())) {
+    return "Data inválida";
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffInDays = Math.floor((today.getTime() - target.getTime()) / 86_400_000);
+
+  if (diffInDays === 0) return "Hoje";
+  if (diffInDays === 1) return "Ontem";
+
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function toISODateLocal(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentMonthDateRange() {
+  const now = new Date();
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    dateFrom: toISODateLocal(firstDay),
+    dateTo: toISODateLocal(lastDay),
+  };
+}
+
+function isISODate(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function mergeSavedDashboardFilters(
+  defaults: {
+    dateFrom: string;
+    dateTo: string;
+    cardFilter: CardFilter;
+    tagFilter: TagFilter;
+  },
+  saved: {
+    dateFrom?: unknown;
+    dateTo?: unknown;
+    cardFilter?: unknown;
+    tagFilter?: unknown;
+  } | null,
+): {
+  dateFrom: string;
+  dateTo: string;
+  cardFilter: CardFilter;
+  tagFilter: TagFilter;
+} {
+  if (!saved) {
+    return defaults;
+  }
+
+  const next = {
+    dateFrom: isISODate(saved.dateFrom) ? saved.dateFrom : defaults.dateFrom,
+    dateTo: isISODate(saved.dateTo) ? saved.dateTo : defaults.dateTo,
+    cardFilter: typeof saved.cardFilter === "string" ? saved.cardFilter : defaults.cardFilter,
+    tagFilter: typeof saved.tagFilter === "string" ? saved.tagFilter : defaults.tagFilter,
+  };
+
+  if (next.dateFrom && next.dateTo && next.dateFrom > next.dateTo) {
+    return {
+      ...next,
+      dateTo: next.dateFrom,
+    };
+  }
+
+  return next;
+}
+
+function formatDateRangeLabel(dateFrom: string, dateTo: string) {
+  const formatSingle = (dateValue: string) => {
+    const parsed = new Date(`${dateValue}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) {
+      return "Data";
+    }
+    return parsed.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+    });
+  };
+
+  if (dateFrom && dateTo) {
+    return `${formatSingle(dateFrom)} - ${formatSingle(dateTo)}`;
+  }
+
+  if (dateFrom) {
+    return `${formatSingle(dateFrom)} em diante`;
+  }
+
+  if (dateTo) {
+    return `Até ${formatSingle(dateTo)}`;
+  }
+
+  return "Período";
+}
+
+function addDays(dateISO: string, offset: number) {
+  const base = new Date(`${dateISO}T00:00:00`);
+  base.setDate(base.getDate() + offset);
+  return toISODateLocal(base);
+}
+
+function getDaysDiffInclusive(dateFrom: string, dateTo: string) {
+  const from = new Date(`${dateFrom}T00:00:00`);
+  const to = new Date(`${dateTo}T00:00:00`);
+  const diffMs = to.getTime() - from.getTime();
+  const diffDays = Math.floor(diffMs / 86_400_000);
+  return Math.max(1, diffDays + 1);
+}
+
+function toCategoryLabel(category: string) {
+  const key = category as ExpenseCategory;
+  if (key in expenseCategoryLabels) {
+    return expenseCategoryLabels[key];
+  }
+
+  const normalized = category.replace(/[-_]/g, " ").trim();
+  if (!normalized) {
+    return "Outros";
+  }
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function toTransactionIcon(category: string): TransactionIcon {
+  const normalized = category.toLowerCase();
+
+  if (normalized.includes("viag") || normalized.includes("transporte")) {
+    return "plane";
+  }
+
+  if (normalized.includes("alimenta") || normalized.includes("restaurante")) {
+    return "utensils";
+  }
+
+  return "shopping";
+}
+
+function formatPercentChange(current: number, previous: number) {
+  if (previous <= 0) {
+    if (current <= 0) {
+      return "0.0%";
+    }
+    return "+100.0%";
+  }
+
+  const value = ((current - previous) / previous) * 100;
+  const signal = value > 0 ? "+" : "";
+  return `${signal}${value.toFixed(1)}%`;
+}
 
 function getSectionVariants(reduceMotion: boolean): {
   container: Variants;
@@ -81,49 +330,6 @@ function getSectionVariants(reduceMotion: boolean): {
   };
 }
 
-function parseCurrencyAmount(amount: string) {
-  const parsed = Number.parseFloat(amount.replace(/[^0-9.-]+/g, ""));
-  return Number.isFinite(parsed) ? Math.abs(parsed) : 0;
-}
-
-function formatCurrencyLabel(value: number) {
-  return `$${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value)}`;
-}
-
-function buildSpendingSummary(filteredAmounts: Map<string, number>): {
-  categories: SpendingCategory[];
-  totalLabel: string;
-} {
-  const total = Array.from(filteredAmounts.values()).reduce((acc, value) => acc + value, 0);
-
-  if (total <= 0) {
-    return {
-      categories: spendingCategories,
-      totalLabel: "$0",
-    };
-  }
-
-  const colorByCategory = new Map(spendingCategories.map((category) => [category.label, category.color]));
-
-  const sorted = Array.from(filteredAmounts.entries()).sort((a, b) => b[1] - a[1]);
-
-  const categories = sorted.map(([label, amount], index) => {
-    const percent = Math.round((amount / total) * 100);
-
-    return {
-      id: `filtered-${label.toLowerCase().replace(/\s+/g, "-")}-${index}`,
-      label,
-      percent,
-      color: colorByCategory.get(label) ?? "#8A816F",
-    };
-  });
-
-  return {
-    categories,
-    totalLabel: formatCurrencyLabel(total),
-  };
-}
-
 function getButtonClass(active: boolean) {
   return [
     "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
@@ -131,26 +337,261 @@ function getButtonClass(active: boolean) {
   ].join(" ");
 }
 
+async function readApiJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+  });
+
+  const rawText = await response.text();
+  const parsed = rawText ? (JSON.parse(rawText) as unknown) : undefined;
+
+  if (!response.ok) {
+    const apiError = (parsed ?? {}) as ApiErrorResponse;
+    throw new ApiRequestError(
+      apiError.error?.message ?? "Falha ao carregar dados do painel.",
+      response.status,
+      apiError.error?.code,
+    );
+  }
+
+  return parsed as T;
+}
+
+function mapCardsToSummary(cards: ApiCardDto[]): CardSummary[] {
+  return cards.map((card, index) => {
+    const isCredit = card.type === "credit";
+    const theme = /black/i.test(card.name) || (isCredit && index === 0) ? "dark" : "light";
+
+    const limitCents = isCredit
+      ? card.creditLimitCents ?? Math.max(card.metrics.creditUsedCents, 1)
+      : Math.max(card.initialBalanceCents + card.metrics.incomeTotalCents, 1);
+
+    const usedCents = isCredit
+      ? card.metrics.creditUsedCents
+      : card.metrics.expenseTotalCents;
+
+    const usedPercent = Math.max(0.02, Math.min(1, usedCents / Math.max(limitCents, 1)));
+
+    return {
+      id: card.id,
+      name: card.name,
+      maskedNumber: card.last4Digits ? `**** ${card.last4Digits}` : "Conta digital",
+      usedLabel: formatCurrencyWithDecimalsFromCents(usedCents),
+      limitLabel: formatCurrencyWithDecimalsFromCents(limitCents),
+      usedPercent,
+      cardHolder: "Usuário",
+      expires: card.last4Digits ? "Ativo" : "--/--",
+      theme,
+    };
+  });
+}
+
+function mapTransactions(transactions: ApiTransactionDto[]): DashboardTransaction[] {
+  return transactions.map((transaction) => {
+    const categoryLabel = toCategoryLabel(transaction.category);
+    const amountLabel = `${transaction.kind === "income" ? "+" : "-"}${formatCurrencyWithDecimalsFromCents(transaction.amountCents)}`;
+    const occurredDateISO = transaction.occurredAt.slice(0, 10);
+
+    return {
+      id: transaction.id,
+      merchant: transaction.merchant,
+      category: categoryLabel,
+      date: formatDateLabel(transaction.occurredAt),
+      amount: amountLabel,
+      icon: toTransactionIcon(transaction.category),
+      cardId: transaction.accountId,
+      tag: transaction.category,
+      ageInMonths: 0,
+      amountValue: transaction.amountCents,
+      kind: transaction.kind,
+      occurredAtISO: transaction.occurredAt,
+      occurredDateISO,
+    };
+  });
+}
+
+function buildSpendingSummary(filteredTransactions: DashboardTransaction[]): {
+  categories: SpendingCategory[];
+  totalLabel: string;
+} {
+  const amountByCategory = new Map<string, number>();
+
+  for (const transaction of filteredTransactions) {
+    if (transaction.kind !== "expense") {
+      continue;
+    }
+
+    const current = amountByCategory.get(transaction.category) ?? 0;
+    amountByCategory.set(transaction.category, current + transaction.amountValue);
+  }
+
+  const total = Array.from(amountByCategory.values()).reduce((acc, value) => acc + value, 0);
+
+  if (total <= 0) {
+    return {
+      categories: [{ id: "empty", label: "Sem gastos", percent: 100, color: "#e5e1d8" }],
+      totalLabel: formatCurrencyFromCents(0),
+    };
+  }
+
+  const sorted = Array.from(amountByCategory.entries()).sort((a, b) => b[1] - a[1]);
+
+  const categories = sorted.map(([label, amount], index) => {
+    const percent = Math.max(1, Math.round((amount / total) * 100));
+    const key = label.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+
+    return {
+      id: `spending-${index}-${key}`,
+      label,
+      percent,
+      color: categoryColorMap[key] ?? "#8A816F",
+    };
+  });
+
+  return {
+    categories,
+    totalLabel: formatCurrencyFromCents(total),
+  };
+}
+
+function buildPortfolioPoints(transactions: DashboardTransaction[]) {
+  const now = new Date();
+  const points: Array<{ label: string; value: number }> = [];
+  let cumulative = 0;
+
+  for (let offset = 8; offset >= 0; offset -= 1) {
+    const monthStart = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() - offset + 1, 1);
+
+    const monthlyNet = transactions.reduce((acc, transaction) => {
+      const occurredAt = new Date(transaction.occurredAtISO);
+      if (occurredAt < monthStart || occurredAt >= nextMonthStart) {
+        return acc;
+      }
+
+      return acc + (transaction.kind === "income" ? transaction.amountValue : -transaction.amountValue);
+    }, 0);
+
+    cumulative += monthlyNet;
+
+    const shortLabel = monthStart
+      .toLocaleDateString("pt-BR", { month: "short" })
+      .replace(".", "");
+
+    points.push({
+      label: shortLabel.charAt(0).toUpperCase() + shortLabel.slice(1, 3),
+      value: Number((cumulative / 100).toFixed(2)),
+    });
+  }
+
+  return points;
+}
+
 export default function DashboardMain() {
   const prefersReducedMotion = useReducedMotion();
   const variants = getSectionVariants(Boolean(prefersReducedMotion));
+  const [hasRestoredFilters, setHasRestoredFilters] = useState(false);
 
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("this-month");
+  const [dateRange, setDateRange] = useState(() => ({
+    ...getCurrentMonthDateRange(),
+  }));
   const [cardFilter, setCardFilter] = useState<CardFilter>("all");
   const [tagFilter, setTagFilter] = useState<TagFilter>("all");
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [cardsData, setCardsData] = useState<ApiCardDto[]>([]);
+  const [transactionsData, setTransactionsData] = useState<DashboardTransaction[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadDashboardData = async () => {
+      try {
+        const [cardsResponse, transactionsResponse] = await Promise.all([
+          readApiJson<{ items: ApiCardDto[] }>("/api/cards"),
+          readApiJson<{ items: ApiTransactionDto[] }>("/api/transactions"),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        const cards = cardsResponse.items;
+        const transactions = mapTransactions(transactionsResponse.items);
+
+        setCardsData(cards);
+        setTransactionsData(transactions);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        const message =
+          error instanceof ApiRequestError
+            ? error.message
+            : "Não foi possível carregar os dados reais do dashboard.";
+        toast.error(message);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadDashboardData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const defaults = {
+      ...getCurrentMonthDateRange(),
+      cardFilter: "all" as CardFilter,
+      tagFilter: "all" as TagFilter,
+    };
+    const saved = readCookieJson<{
+      dateFrom?: unknown;
+      dateTo?: unknown;
+      cardFilter?: unknown;
+      tagFilter?: unknown;
+    }>(DASHBOARD_FILTERS_COOKIE);
+
+    const restored = mergeSavedDashboardFilters(defaults, saved);
+    setDateRange({ dateFrom: restored.dateFrom, dateTo: restored.dateTo });
+    setCardFilter(restored.cardFilter);
+    setTagFilter(restored.tagFilter);
+    setHasRestoredFilters(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasRestoredFilters) {
+      return;
+    }
+
+    writeCookieJson(DASHBOARD_FILTERS_COOKIE, {
+      dateFrom: dateRange.dateFrom,
+      dateTo: dateRange.dateTo,
+      cardFilter,
+      tagFilter,
+    });
+  }, [cardFilter, dateRange.dateFrom, dateRange.dateTo, hasRestoredFilters, tagFilter]);
+
+  const activeCards = useMemo(() => mapCardsToSummary(cardsData), [cardsData]);
 
   const cardOptions = useMemo(
     () => [
       { value: "all", label: "Todos os cartões" },
       ...activeCards.map((card) => ({ value: card.id, label: card.name })),
     ],
-    [],
+    [activeCards],
   );
 
   const tagOptions = useMemo(() => {
     const uniqueTags = new Map<string, string>();
 
-    for (const transaction of recentTransactions) {
+    for (const transaction of transactionsData) {
       if (!uniqueTags.has(transaction.tag)) {
         uniqueTags.set(transaction.tag, transaction.category);
       }
@@ -160,21 +601,53 @@ export default function DashboardMain() {
       { value: "all", label: "Todas as etiquetas" },
       ...Array.from(uniqueTags.entries()).map(([value, label]) => ({ value, label })),
     ];
-  }, []);
+  }, [transactionsData]);
 
-  const selectedPeriod = periodOptions.find((option) => option.value === periodFilter) ?? periodOptions[0];
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
+    if (cardFilter !== "all" && !cardOptions.some((option) => option.value === cardFilter)) {
+      setCardFilter("all");
+    }
+  }, [cardFilter, cardOptions, isLoading]);
+
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
+    if (tagFilter !== "all" && !tagOptions.some((option) => option.value === tagFilter)) {
+      setTagFilter("all");
+    }
+  }, [tagFilter, tagOptions, isLoading]);
+
   const selectedCard = cardOptions.find((option) => option.value === cardFilter) ?? cardOptions[0];
   const selectedTag = tagOptions.find((option) => option.value === tagFilter) ?? tagOptions[0];
+  const selectedDateRangeLabel = formatDateRangeLabel(dateRange.dateFrom, dateRange.dateTo);
 
-  const filteredTransactions = useMemo(() => {
-    return recentTransactions.filter((transaction) => {
-      const withinPeriod = transaction.ageInMonths <= selectedPeriod.maxAgeInMonths;
+  const cardAndTagFilteredTransactions = useMemo(() => {
+    return transactionsData.filter((transaction) => {
       const byCard = cardFilter === "all" || transaction.cardId === cardFilter;
       const byTag = tagFilter === "all" || transaction.tag === tagFilter;
-
-      return withinPeriod && byCard && byTag;
+      return byCard && byTag;
     });
-  }, [cardFilter, selectedPeriod.maxAgeInMonths, tagFilter]);
+  }, [cardFilter, tagFilter, transactionsData]);
+
+  const filteredTransactions = useMemo(() => {
+    return cardAndTagFilteredTransactions.filter((transaction) => {
+      if (dateRange.dateFrom && transaction.occurredDateISO < dateRange.dateFrom) {
+        return false;
+      }
+
+      if (dateRange.dateTo && transaction.occurredDateISO > dateRange.dateTo) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [cardAndTagFilteredTransactions, dateRange.dateFrom, dateRange.dateTo]);
 
   const filteredCards = useMemo(() => {
     if (cardFilter === "all") {
@@ -182,18 +655,120 @@ export default function DashboardMain() {
     }
 
     return activeCards.filter((card) => card.id === cardFilter);
-  }, [cardFilter]);
+  }, [activeCards, cardFilter]);
 
-  const spendingSummary = useMemo(() => {
-    const amountByCategory = new Map<string, number>();
+  const spendingSummary = useMemo(
+    () => buildSpendingSummary(filteredTransactions),
+    [filteredTransactions],
+  );
 
-    for (const transaction of filteredTransactions) {
-      const current = amountByCategory.get(transaction.category) ?? 0;
-      amountByCategory.set(transaction.category, current + parseCurrencyAmount(transaction.amount));
+  const portfolioPoints = useMemo(
+    () => buildPortfolioPoints(cardAndTagFilteredTransactions),
+    [cardAndTagFilteredTransactions],
+  );
+
+  const cardsForAvailableBalance = useMemo(() => {
+    if (cardFilter === "all") {
+      return cardsData;
     }
 
-    return buildSpendingSummary(amountByCategory);
-  }, [filteredTransactions]);
+    return cardsData.filter((card) => card.id === cardFilter);
+  }, [cardFilter, cardsData]);
+
+  const kpiCards = useMemo<KpiCard[]>(() => {
+    const totalAvailableCents = cardsForAvailableBalance.reduce(
+      (acc, card) => acc + card.metrics.availableCents,
+      0,
+    );
+    const selectedAccountsCount = cardsForAvailableBalance.length;
+    const accountsLabel = cardFilter === "all" ? "contas ativas" : "contas selecionadas";
+
+    const inflowCurrent = filteredTransactions
+      .filter((transaction) => transaction.kind === "income")
+      .reduce((acc, transaction) => acc + transaction.amountValue, 0);
+
+    const outflowCurrent = filteredTransactions
+      .filter((transaction) => transaction.kind === "expense")
+      .reduce((acc, transaction) => acc + transaction.amountValue, 0);
+
+    const periodLength = getDaysDiffInclusive(dateRange.dateFrom, dateRange.dateTo);
+    const previousDateTo = addDays(dateRange.dateFrom, -1);
+    const previousDateFrom = addDays(previousDateTo, -(periodLength - 1));
+    const previousRangeLabel = formatDateRangeLabel(previousDateFrom, previousDateTo);
+
+    const previousTransactions = cardAndTagFilteredTransactions.filter((transaction) => (
+      transaction.occurredDateISO >= previousDateFrom
+      && transaction.occurredDateISO <= previousDateTo
+    ));
+
+    const inflowPrevious = previousTransactions
+      .filter((transaction) => transaction.kind === "income")
+      .reduce((acc, transaction) => acc + transaction.amountValue, 0);
+
+    const outflowPrevious = previousTransactions
+      .filter((transaction) => transaction.kind === "expense")
+      .reduce((acc, transaction) => acc + transaction.amountValue, 0);
+
+    const inflowChange = formatPercentChange(inflowCurrent, inflowPrevious);
+    const outflowChange = formatPercentChange(outflowCurrent, outflowPrevious);
+
+    const inflowPercent = Number(inflowChange.replace("%", ""));
+    const outflowPercent = Number(outflowChange.replace("%", ""));
+
+    return [
+      {
+        id: "available-balance",
+        title: "Saldo disponível",
+        value: formatCurrencyFromCents(totalAvailableCents),
+        change: `${selectedAccountsCount}`,
+        changeLabel: accountsLabel,
+        tone: "positive",
+        icon: "bank",
+      },
+      {
+        id: "period-inflow",
+        title: "Entradas do período",
+        value: formatCurrencyFromCents(inflowCurrent),
+        change: inflowChange,
+        changeLabel: `vs ${previousRangeLabel}`,
+        tone: inflowPercent >= 0 ? "positive" : "negative",
+        icon: "piggy",
+      },
+      {
+        id: "period-outflow",
+        title: "Saídas do período",
+        value: formatCurrencyFromCents(outflowCurrent),
+        change: outflowChange,
+        changeLabel: `vs ${previousRangeLabel}`,
+        tone: outflowPercent > 0 ? "warning" : "positive",
+        icon: "wallet",
+      },
+    ];
+  }, [
+    cardAndTagFilteredTransactions,
+    cardFilter,
+    cardsForAvailableBalance,
+    dateRange.dateFrom,
+    dateRange.dateTo,
+    filteredTransactions,
+  ]);
+
+  if (isLoading) {
+    return (
+      <main className="relative min-w-0 flex-1 overflow-x-hidden bg-[linear-gradient(134.5deg,#f8f7f6_0%,#eceae5_100%)]">
+        <div className="relative mx-auto w-full max-w-[1280px] space-y-8 p-4 sm:p-6 lg:p-8">
+          <Skeleton className="h-28 rounded-3xl bg-white/70" />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <Skeleton className="h-40 rounded-3xl bg-white/70" />
+            <Skeleton className="h-40 rounded-3xl bg-white/70" />
+            <Skeleton className="h-40 rounded-3xl bg-white/70" />
+          </div>
+          <Skeleton className="h-[320px] rounded-3xl bg-white/70" />
+          <Skeleton className="h-[280px] rounded-3xl bg-white/70" />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-w-0 flex-1 overflow-x-hidden bg-[linear-gradient(134.5deg,#f8f7f6_0%,#eceae5_100%)]">
@@ -214,7 +789,7 @@ export default function DashboardMain() {
               Visão geral financeira
             </h1>
             <p className="mt-1 text-sm text-[#877e64] sm:text-base">
-              Acompanhe a distribuição do seu patrimônio e seus hábitos de gastos.
+              Acompanhe seu saldo, movimentações e hábitos com dados reais da conta.
             </p>
           </div>
 
@@ -222,21 +797,58 @@ export default function DashboardMain() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={getButtonClass(true)}>
-                  {selectedPeriod.label}
-                  <ChevronDown className="h-4 w-4" />
+                  <CalendarRange className="h-4 w-4 text-[#8d836b]" />
+                  {selectedDateRangeLabel}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-52">
-                <DropdownMenuRadioGroup
-                  value={periodFilter}
-                  onValueChange={(value) => setPeriodFilter(value as PeriodFilter)}
-                >
-                  {periodOptions.map((option) => (
-                    <DropdownMenuRadioItem key={option.value} value={option.value}>
-                      {option.label}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
+              <DropdownMenuContent align="end" className="w-[320px] rounded-xl p-3">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase tracking-[0.08em] text-[#7f7761]">
+                      Data inicial
+                    </label>
+                    <Input
+                      type="date"
+                      value={dateRange.dateFrom}
+                      onChange={(event) =>
+                        setDateRange((previous) => ({
+                          ...previous,
+                          dateFrom: event.target.value,
+                          dateTo:
+                            previous.dateTo
+                            && event.target.value
+                            && previous.dateTo < event.target.value
+                              ? event.target.value
+                              : previous.dateTo,
+                        }))
+                      }
+                      className="h-10 rounded-lg border-[#e8e2d6] bg-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase tracking-[0.08em] text-[#7f7761]">
+                      Data final
+                    </label>
+                    <Input
+                      type="date"
+                      value={dateRange.dateTo}
+                      onChange={(event) =>
+                        setDateRange((previous) => ({
+                          ...previous,
+                          dateTo: event.target.value,
+                          dateFrom:
+                            previous.dateFrom
+                            && event.target.value
+                            && previous.dateFrom > event.target.value
+                              ? event.target.value
+                              : previous.dateFrom,
+                        }))
+                      }
+                      className="h-10 rounded-lg border-[#e8e2d6] bg-white"
+                    />
+                  </div>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
 

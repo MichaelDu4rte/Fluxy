@@ -1,10 +1,15 @@
-export type NavItemId = "dashboard" | "wallet" | "planner" | "vault" | "settings";
+export type NavItemId =
+  | "dashboard"
+  | "expenses"
+  | "wallet"
+  | "planner"
+  | "vault"
+  | "settings";
 
 export type NavItem = {
   id: NavItemId;
   label: string;
   href: string;
-  isActive?: boolean;
 };
 
 export type KpiTone = "positive" | "warning" | "negative";
@@ -49,6 +54,14 @@ export type CardSummary = {
   cardHolder: string;
   expires: string;
   theme: CardTheme;
+};
+
+export type WalletAccount = {
+  id: "black" | "platinum" | "investment";
+  name: string;
+  balance: number;
+  kindLabel: string;
+  accent: "dark" | "light";
 };
 
 export type TransactionIcon = "plane" | "utensils" | "shopping";
