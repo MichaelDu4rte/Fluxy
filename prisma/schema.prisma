@@ -23,6 +23,8 @@ model User {
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
+  financialAccounts     FinancialAccount[]
+  financialTransactions FinancialTransaction[]
 
   @@unique([email])
   @@map("user")
@@ -74,4 +76,81 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+enum FinancialAccountType {
+  CREDIT
+  DEBIT
+  INVESTMENT
+}
+
+enum MarketProvider {
+  COINGECKO
+}
+
+enum TransactionKind {
+  EXPENSE
+  INCOME
+}
+
+enum TransactionStatus {
+  PAID
+  PENDING
+  LATE
+}
+
+enum TransactionFrequency {
+  ONE_OFF
+  RECURRING
+}
+
+model FinancialAccount {
+  id                  String               @id @default(cuid())
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  type                FinancialAccountType
+  investmentProvider  MarketProvider?
+  investmentAssetId   String?
+  investmentAssetSymbol String?
+  investmentAssetName String?
+  investmentEntryPriceBrl Float?
+  last4Digits         String?
+  creditLimitCents    Int?
+  initialBalanceCents Int                  @default(0)
+  isActive            Boolean              @default(true)
+  transactions        FinancialTransaction[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([userId, isActive])
+  @@map("financial_account")
+}
+
+model FinancialTransaction {
+  id               String               @id @default(cuid())
+  userId           String
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId        String
+  account          FinancialAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  kind             TransactionKind
+  status           TransactionStatus
+  frequency        TransactionFrequency @default(ONE_OFF)
+  category         String
+  merchant         String
+  description      String?
+  amountCents      Int
+  occurredAt       DateTime
+  seriesId         String?
+  isInstallment    Boolean              @default(false)
+  installmentIndex Int                  @default(1)
+  installmentTotal Int                  @default(1)
+  isRecurring      Boolean              @default(false)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([userId, occurredAt(sort: Desc)])
+  @@index([accountId, occurredAt(sort: Desc)])
+  @@index([userId, seriesId])
+  @@map("financial_transaction")
 }
