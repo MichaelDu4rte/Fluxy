@@ -21,13 +21,31 @@ function normalizeConnectionStringForPg(rawConnectionString: string): string {
   return parsedUrl.toString();
 }
 
-const shouldRejectUnauthorized =
-  process.env.PG_SSL_REJECT_UNAUTHORIZED === "false"
-    ? false
-    : process.env.NODE_ENV === "production";
+function resolveRejectUnauthorized(connectionUrl: URL): boolean {
+  const envValue = process.env.PG_SSL_REJECT_UNAUTHORIZED;
+
+  if (envValue === "true") {
+    return true;
+  }
+
+  if (envValue === "false") {
+    return false;
+  }
+
+  // Supabase pooler often presents cert chains that fail strict validation on some runtimes.
+  if (connectionUrl.hostname.endsWith(".pooler.supabase.com")) {
+    return false;
+  }
+
+  return process.env.NODE_ENV === "production";
+}
+
+const normalizedConnectionString = normalizeConnectionStringForPg(connectionString);
+const connectionUrl = new URL(normalizedConnectionString);
+const shouldRejectUnauthorized = resolveRejectUnauthorized(connectionUrl);
 
 const pool = new Pool({
-  connectionString: normalizeConnectionStringForPg(connectionString),
+  connectionString: connectionUrl.toString(),
   ssl: { rejectUnauthorized: shouldRejectUnauthorized },
 });
 

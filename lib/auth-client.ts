@@ -11,7 +11,7 @@ function getAuthBaseUrl(): string | undefined {
 
 export const authClient = createAuthClient({
   /** The base URL of the server (optional if you're using the same domain) */
-  baseURL: getAuthBaseUrl() || "http://localhost:3000",
+  baseURL: getAuthBaseUrl(),
 });
 
 export const {
