@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "MarketProvider" AS ENUM ('COINGECKO');
 
 -- AlterTable
