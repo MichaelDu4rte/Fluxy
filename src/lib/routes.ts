@@ -5,7 +5,14 @@ export const AUTH_ROUTES = [SIGN_IN_ROUTE, SIGN_UP_ROUTE] as const;
 
 export const DEFAULT_REDIRECT_AFTER_LOGIN = "/dashboard";
 
-export const PROTECTED_PREFIXES = ["/dashboard", "/settings", "/app"] as const;
+export const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/transacoes",
+  "/despesas",
+  "/carteira",
+  "/settings",
+  "/app",
+] as const;
 
 const normalizePath = (pathname: string): string => {
   if (!pathname) return "/";
