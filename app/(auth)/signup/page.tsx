@@ -1,13 +1,15 @@
-"use client"
+"use client";
 
+import { AuthLayout } from "@/components/auth/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signUp } from "@/lib/auth-client";
+import { useIsMobile } from "@/src/lib/use-is-mobile";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AuthLayout } from "@/components/auth/AuthLayout";
 
 type PasswordStrength = {
   label: string;
@@ -20,18 +22,19 @@ type PasswordValidation = {
   isValid: boolean;
   missingRequirements: string[];
 };
+const enterEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 function validatePasswordRequirements(password: string): PasswordValidation {
   const missingRequirements: string[] = [];
 
   if (password.length < 8) {
-    missingRequirements.push("minimo de 8 caracteres");
+    missingRequirements.push("mínimo de 8 caracteres");
   }
   if (!/[A-Za-z]/.test(password)) {
     missingRequirements.push("ao menos 1 letra");
   }
   if (!/\d/.test(password)) {
-    missingRequirements.push("ao menos 1 numero");
+    missingRequirements.push("ao menos 1 número");
   }
   if (!/[^A-Za-z0-9]/.test(password)) {
     missingRequirements.push("ao menos 1 caractere especial");
@@ -99,8 +102,69 @@ function getPasswordStrength(password: string): PasswordStrength {
   };
 }
 
+function getAuthMotionVariants(
+  isMobile: boolean,
+  reduceMotion: boolean,
+): { container: Variants; item: Variants } {
+  if (reduceMotion) {
+    return {
+      container: {
+        hidden: { opacity: 0 },
+        visible: {
+          opacity: 1,
+          transition: {
+            duration: 0.2,
+            when: "beforeChildren",
+            staggerChildren: 0.03,
+          },
+        },
+      },
+      item: {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1, transition: { duration: 0.18 } },
+      },
+    };
+  }
+
+  const containerY = isMobile ? 10 : 18;
+  const itemY = isMobile ? 6 : 10;
+  const containerDuration = isMobile ? 0.4 : 0.55;
+  const itemDuration = isMobile ? 0.3 : 0.45;
+  const stagger = isMobile ? 0.05 : 0.08;
+
+  return {
+    container: {
+      hidden: { opacity: 0, y: containerY },
+      visible: {
+        opacity: 1,
+        y: 0,
+        transition: {
+          duration: containerDuration,
+          ease: enterEase,
+          when: "beforeChildren",
+          staggerChildren: stagger,
+        },
+      },
+    },
+    item: {
+      hidden: { opacity: 0, y: itemY },
+      visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: itemDuration, ease: enterEase },
+      },
+    },
+  };
+}
+
 export default function RegisterPage() {
   const router = useRouter();
+  const isMobile = useIsMobile();
+  const prefersReducedMotion = useReducedMotion();
+  const motionVariants = useMemo(
+    () => getAuthMotionVariants(isMobile, Boolean(prefersReducedMotion)),
+    [isMobile, prefersReducedMotion],
+  );
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -116,7 +180,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     if (password !== passwordConfirm) {
-      toast.error("Senhas nao conferem", {
+      toast.error("As senhas não conferem", {
         description: "Digite a mesma senha nos dois campos.",
       });
       setLoading(false);
@@ -126,7 +190,7 @@ export default function RegisterPage() {
     const passwordValidation = validatePasswordRequirements(password);
 
     if (!passwordValidation.isValid) {
-      toast.error("Senha invalida", {
+      toast.error("Senha inválida", {
         description: `Sua senha precisa ter ${passwordValidation.missingRequirements.join(", ")}.`,
       });
       setLoading(false);
@@ -137,7 +201,7 @@ export default function RegisterPage() {
       const result = await signUp.email({ email, name, password });
 
       if (result.error) {
-        toast.error("Nao foi possivel criar sua conta", {
+        toast.error("Não foi possível criar sua conta", {
           description: "Verifique os dados informados e tente novamente.",
         });
       } else {
@@ -164,149 +228,167 @@ export default function RegisterPage() {
       heroSubtitle="Crie sua conta em poucos instantes"
       heroFooterLeft="Fluxy"
       heroFooterRight="Conta gratuita"
+      footerHref="/signin"
+      footerLeadText="Ja tem uma conta?"
+      footerActionText="Entrar"
     >
-      <header className="mb-12">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Criar conta na Fluxy
-        </h1>
-        <p className="mt-2 text-base text-stone-500">
-          Centralize suas contas, despesas e investimentos em um unico lugar.
-        </p>
-      </header>
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={motionVariants.container}
+      >
+        <motion.header variants={motionVariants.item} className="mb-8 sm:mb-12">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            Criar conta na Fluxy
+          </h1>
+          <p className="mt-2 text-sm text-stone-500 sm:text-base">
+            Centralize suas contas, despesas e investimentos em um unico lugar.
+          </p>
+        </motion.header>
 
-      <form className="space-y-6" onSubmit={handleRegister}>
-        <div className="space-y-2">
-          <label
-            className="ml-1 block text-xs font-semibold uppercase tracking-widest text-stone-500"
-            htmlFor="name"
-          >
-            Nome completo
-          </label>
-          <Input
-            id="name"
-            type="text"
-            placeholder="Seu nome"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label
-            className="ml-1 block text-xs font-semibold uppercase tracking-widest text-stone-500"
-            htmlFor="email"
-          >
-            Email
-          </label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="voce@fluxy.app"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label
-            className="ml-1 block text-xs font-semibold uppercase tracking-widest text-stone-500"
-            htmlFor="password"
-          >
-            Senha
-          </label>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="********"
-              autoComplete="new-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="pr-10"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute inset-y-0 right-0 flex items-center pr-3 text-stone-400 transition-colors hover:text-stone-600"
-              aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-            >
-              {showPassword ? (
-                <EyeOff className="h-4.5 w-4.5" aria-hidden />
-              ) : (
-                <Eye className="h-4.5 w-4.5" aria-hidden />
-              )}
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label
-            className="ml-1 block text-xs font-semibold uppercase tracking-widest text-stone-500"
-            htmlFor="passwordConfirm"
-          >
-            Confirmar senha
-          </label>
-          <div className="relative">
-            <Input
-              id="passwordConfirm"
-              type={showPasswordConfirm ? "text" : "password"}
-              placeholder="********"
-              autoComplete="new-password"
-              value={passwordConfirm}
-              onChange={(event) => setPasswordConfirm(event.target.value)}
-              className="pr-10"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPasswordConfirm((prev) => !prev)}
-              className="absolute inset-y-0 right-0 flex items-center pr-3 text-stone-400 transition-colors hover:text-stone-600"
-              aria-label={
-                showPasswordConfirm ? "Ocultar confirmacao da senha" : "Mostrar confirmacao da senha"
-              }
-            >
-              {showPasswordConfirm ? (
-                <EyeOff className="h-4.5 w-4.5" aria-hidden />
-              ) : (
-                <Eye className="h-4.5 w-4.5" aria-hidden />
-              )}
-            </button>
-          </div>
-
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-500">
-                Força da senha
-              </span>
-              <span
-                className={`text-xs font-medium transition-colors ${passwordStrength.toneClassName}`}
-                aria-live="polite"
-              >
-                {passwordStrength.label}
-              </span>
-            </div>
-
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${passwordStrength.barClassName}`}
-                style={{ width: `${passwordStrength.progress}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        <Button
-          type="submit"
-          disabled={loading}
-          className="mt-4 h-12 w-full rounded-xl bg-[#C5B358] font-semibold text-white shadow-lg shadow-[#C5B358]/20 transition-all duration-300 hover:bg-[#B3A24E] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+        <motion.form
+          variants={motionVariants.item}
+          className="space-y-5 sm:space-y-6"
+          onSubmit={handleRegister}
         >
-          {loading ? "Criando conta..." : "Criar conta"}
-        </Button>
-      </form>
+          <motion.div variants={motionVariants.item} className="space-y-2">
+            <label
+              className="ml-1 block text-xs font-semibold uppercase tracking-widest text-stone-500"
+              htmlFor="name"
+            >
+              Nome completo
+            </label>
+            <Input
+              id="name"
+              type="text"
+              placeholder="Seu nome"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className="h-11 px-3 text-base sm:h-8 sm:px-2.5 sm:text-sm"
+              required
+            />
+          </motion.div>
+
+          <motion.div variants={motionVariants.item} className="space-y-2">
+            <label
+              className="ml-1 block text-xs font-semibold uppercase tracking-widest text-stone-500"
+              htmlFor="email"
+            >
+              Email
+            </label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="voce@fluxy.app"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="h-11 px-3 text-base sm:h-8 sm:px-2.5 sm:text-sm"
+              required
+            />
+          </motion.div>
+
+          <motion.div variants={motionVariants.item} className="space-y-2">
+            <label
+              className="ml-1 block text-xs font-semibold uppercase tracking-widest text-stone-500"
+              htmlFor="password"
+            >
+              Senha
+            </label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="********"
+                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="h-11 pr-10 pl-3 text-base sm:h-8 sm:px-2.5 sm:text-sm"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-stone-400 transition-colors hover:text-stone-600 sm:pr-3"
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4.5 w-4.5" aria-hidden />
+                ) : (
+                  <Eye className="h-4.5 w-4.5" aria-hidden />
+                )}
+              </button>
+            </div>
+          </motion.div>
+
+          <motion.div variants={motionVariants.item} className="space-y-2">
+            <label
+              className="ml-1 block text-xs font-semibold uppercase tracking-widest text-stone-500"
+              htmlFor="passwordConfirm"
+            >
+              Confirmar senha
+            </label>
+            <div className="relative">
+              <Input
+                id="passwordConfirm"
+                type={showPasswordConfirm ? "text" : "password"}
+                placeholder="********"
+                autoComplete="new-password"
+                value={passwordConfirm}
+                onChange={(event) => setPasswordConfirm(event.target.value)}
+                className="h-11 pr-10 pl-3 text-base sm:h-8 sm:px-2.5 sm:text-sm"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPasswordConfirm((prev) => !prev)}
+                className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-stone-400 transition-colors hover:text-stone-600 sm:pr-3"
+                aria-label={
+                  showPasswordConfirm
+                    ? "Ocultar confirmacao da senha"
+                    : "Mostrar confirmacao da senha"
+                }
+              >
+                {showPasswordConfirm ? (
+                  <EyeOff className="h-4.5 w-4.5" aria-hidden />
+                ) : (
+                  <Eye className="h-4.5 w-4.5" aria-hidden />
+                )}
+              </button>
+            </div>
+
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-500">
+                  Forca da senha
+                </span>
+                <span
+                  className={`text-xs font-medium transition-colors ${passwordStrength.toneClassName}`}
+                  aria-live="polite"
+                >
+                  {passwordStrength.label}
+                </span>
+              </div>
+
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${passwordStrength.barClassName}`}
+                  style={{ width: `${passwordStrength.progress}%` }}
+                />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div variants={motionVariants.item}>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="mt-3 h-11 w-full rounded-xl bg-[#C5B358] font-semibold text-white shadow-lg shadow-[#C5B358]/20 transition-all duration-300 hover:bg-[#B3A24E] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 sm:mt-4 sm:h-12"
+            >
+              {loading ? "Criando conta..." : "Criar conta"}
+            </Button>
+          </motion.div>
+        </motion.form>
+      </motion.div>
     </AuthLayout>
   );
 }
-

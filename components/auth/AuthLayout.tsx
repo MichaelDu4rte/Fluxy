@@ -9,6 +9,9 @@ type AuthLayoutProps = {
   heroSubtitle?: ReactNode;
   heroFooterLeft: string;
   heroFooterRight: string;
+  footerHref: string;
+  footerLeadText: string;
+  footerActionText: string;
 };
 
 export function AuthLayout({
@@ -17,21 +20,43 @@ export function AuthLayout({
   heroSubtitle,
   heroFooterLeft,
   heroFooterRight,
+  footerHref,
+  footerLeadText,
+  footerActionText,
 }: AuthLayoutProps) {
   return (
-    <main className="min-h-screen w-full bg-[#f9f7f2] text-[#1c1917] selection:bg-[#C5B358]/30">
-      <div className="flex min-h-screen w-full flex-col md:flex-row">
-        <section
-          className="relative hidden w-1/2 overflow-hidden md:flex"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 0% 0%, rgba(0,0,0,0.5), transparent 55%), radial-gradient(circle at 100% 100%, rgba(0,0,0,0.55), transparent 60%), url('/fluxy-gold-bg.png')",
-            backgroundSize: "140% 140%, 140% 140%, cover",
-            backgroundPosition: "top left, bottom right, center",
-          }}
-        >
+    <main className="min-h-[100dvh] w-full bg-[#f9f7f2] text-[#1c1917] selection:bg-[#C5B358]/30">
+      <div className="flex min-h-[100dvh] w-full flex-col md:flex-row">
+        <section className="relative hidden w-1/2 overflow-hidden md:flex">
+          <video
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            poster="/fluxy-gold-bg.png"
+            onLoadedMetadata={(event) => {
+              event.currentTarget.playbackRate = 0.72;
+            }}
+            aria-hidden
+          >
+            <source src="/bg-gradient.mp4" type="video/mp4" />
+          </video>
+
           <div
-            className="absolute inset-0 bg-black/45 mix-blend-multiply"
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 0% 0%, rgba(0,0,0,0.62), transparent 55%), radial-gradient(circle at 100% 100%, rgba(0,0,0,0.68), transparent 60%)",
+              backgroundSize: "140% 140%, 140% 140%",
+              backgroundPosition: "top left, bottom right",
+            }}
+            aria-hidden
+          />
+
+          <div
+            className="absolute inset-0 bg-black/55 mix-blend-multiply"
             aria-hidden
           />
 
@@ -57,18 +82,18 @@ export function AuthLayout({
           </div>
         </section>
 
-        <section className="flex w-full flex-col justify-center bg-white md:w-1/2">
-          <div className="mx-auto w-full max-w-md px-8 py-12">
+        <section className="flex w-full flex-col justify-start overflow-y-auto bg-white md:w-1/2 md:justify-center">
+          <div className="mx-auto w-full max-w-md px-5 py-8 sm:px-8 sm:py-12">
             {children}
 
-            <footer className="mt-12 text-center">
+            <footer className="mt-10 text-center sm:mt-12">
               <Link
-                href="/signin"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 transition-colors hover:text-[#C5B358]"
+                href={footerHref}
+                className="inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-center text-sm font-medium leading-relaxed text-stone-500 transition-colors hover:text-[#C5B358]"
               >
-                Ja tem uma conta?
+                {footerLeadText}
                 <span className="font-bold text-[#C5B358] underline decoration-[#C5B358]/30 underline-offset-4">
-                  Entrar
+                  {footerActionText}
                 </span>
               </Link>
             </footer>
