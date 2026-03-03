@@ -1,16 +1,10 @@
 import { requireUser } from "@/src/lib/auth-guards";
-import LogoutButton from "./LogoutButton";
+import DashboardLayout from "@/components/dashboard/DashboardLayout";
 
 export default async function DashboardPage() {
   const user = await requireUser({ currentPath: "/dashboard" });
+  const userName = user.name?.trim() || user.email?.split("@")[0] || "Aureum";
+  const userEmail = user.email || "premium@aureum.app";
 
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>Bem-vindo, {user.email ?? user.id}</p>
-      <div className="mt-4">
-        <LogoutButton />
-      </div>
-    </div>
-  );
+  return <DashboardLayout userName={userName} userEmail={userEmail} />;
 }

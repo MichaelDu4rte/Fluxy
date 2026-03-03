@@ -1,0 +1,109 @@
+"use client";
+
+import { dashboardNavItems } from "@/components/dashboard/dashboard-mock-data";
+import DashboardMain from "@/components/dashboard/DashboardMain";
+import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Menu, X } from "lucide-react";
+import { useEffect, useState } from "react";
+
+type DashboardLayoutProps = {
+  userName: string;
+  userEmail: string;
+};
+
+export default function DashboardLayout({
+  userName,
+  userEmail,
+}: DashboardLayoutProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!sidebarOpen) {
+      document.body.style.removeProperty("overflow");
+      return;
+    }
+
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.removeProperty("overflow");
+    };
+  }, [sidebarOpen]);
+
+  return (
+    <div className="min-h-[100dvh] bg-[#f8f7f3] text-[#171611]">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-[#e5e1d8] bg-white/90 px-4 py-3 backdrop-blur md:hidden">
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#ece7dc] text-[#171611]"
+          aria-label="Abrir navegação"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
+        <div className="text-sm font-semibold tracking-[0.2em] uppercase text-[#877e64]">
+          Fluxy
+        </div>
+
+        <div className="h-10 w-10" aria-hidden />
+      </header>
+
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[304px] md:block">
+        <DashboardSidebar
+          userName={userName}
+          userEmail={userEmail}
+          items={dashboardNavItems}
+          className="h-full"
+        />
+      </aside>
+
+      <AnimatePresence>
+        {sidebarOpen ? (
+          <>
+            <motion.div
+              className="fixed inset-0 z-40 bg-black/30 md:hidden"
+              onClick={() => setSidebarOpen(false)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: prefersReducedMotion ? 0.12 : 0.2 }}
+            />
+
+            <motion.aside
+              className="fixed inset-y-0 left-0 z-50 w-[304px] md:hidden"
+              initial={{ x: prefersReducedMotion ? 0 : -28, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: prefersReducedMotion ? 0 : -28, opacity: 0 }}
+              transition={{ duration: prefersReducedMotion ? 0.14 : 0.24 }}
+            >
+              <div className="absolute right-3 top-3 z-10">
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(false)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#e7e3da] bg-white text-[#171611]"
+                  aria-label="Fechar navegação"
+                >
+                  <X className="h-4.5 w-4.5" />
+                </button>
+              </div>
+
+              <DashboardSidebar
+                userName={userName}
+                userEmail={userEmail}
+                items={dashboardNavItems}
+                onNavigate={() => setSidebarOpen(false)}
+                className="h-full"
+              />
+            </motion.aside>
+          </>
+        ) : null}
+      </AnimatePresence>
+
+      <div className="min-w-0 md:ml-[304px]">
+        <DashboardMain />
+      </div>
+    </div>
+  );
+}

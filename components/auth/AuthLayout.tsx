@@ -25,7 +25,7 @@ export function AuthLayout({
   footerActionText,
 }: AuthLayoutProps) {
   return (
-    <main className="min-h-[100dvh] w-full bg-[#f9f7f2] text-[#1c1917] selection:bg-[#C5B358]/30">
+    <main className="min-h-[100dvh] w-full bg-[#f9f7f2] text-[#1c1917]">
       <div className="flex min-h-[100dvh] w-full flex-col md:flex-row">
         <section className="relative hidden w-1/2 overflow-hidden md:flex">
           <video

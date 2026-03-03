@@ -120,6 +120,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+  ::selection {
+    background-color: rgb(197 179 88 / 0.3);
+    color: #1c1917;
+  }
+  ::-moz-selection {
+    background-color: rgb(197 179 88 / 0.3);
+    color: #1c1917;
+  }
   body {
     @apply bg-background text-foreground;
   }
