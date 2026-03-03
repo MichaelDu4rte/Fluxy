@@ -5,7 +5,6 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 import {
   isAuthRoute,
   isProtectedRoute,
@@ -25,9 +24,24 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  let session = null;
+
+  try {
+    const { auth } = await import("@/lib/auth");
+    session = await auth.api.getSession({
+      headers: await headers(),
+    });
+  } catch (error) {
+    console.error("[proxy] Failed to resolve session", error);
+
+    // Fail-safe behavior: don't block auth pages, and redirect protected pages.
+    if (onProtectedRoute) {
+      const signInPath = buildSignInRedirect(pathWithSearch);
+      return NextResponse.redirect(new URL(signInPath, request.url));
+    }
+
+    return NextResponse.next();
+  }
 
   // Não logado tentando acessar rota protegida
   if (!session && onProtectedRoute) {
