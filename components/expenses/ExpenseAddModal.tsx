@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   CalendarRange,
   CarTaxiFront,
@@ -209,6 +209,24 @@ export default function ExpenseAddModal({
       whileTap: { scale: 0.985 },
     };
 
+  const kindToggleTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const };
+
+  const kindContentMotion = prefersReducedMotion
+    ? {
+      initial: { opacity: 1, y: 0 },
+      animate: { opacity: 1, y: 0 },
+      exit: { opacity: 1, y: 0 },
+      transition: { duration: 0 },
+    }
+    : {
+      initial: { opacity: 0, y: 10 },
+      animate: { opacity: 1, y: 0 },
+      exit: { opacity: 0, y: -8 },
+      transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] as const },
+    };
+
   const cardButtonMotion = prefersReducedMotion
     ? {}
     : {
@@ -358,16 +376,23 @@ export default function ExpenseAddModal({
                 }}
                 disabled={isBusy}
                 className={cn(
-                  "h-9 flex-1 rounded-full text-xs font-semibold uppercase tracking-[0.12em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b38c19]/60 disabled:cursor-not-allowed disabled:opacity-60",
+                  "relative h-9 flex-1 rounded-full text-xs font-semibold uppercase tracking-[0.12em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b38c19]/60 disabled:cursor-not-allowed disabled:opacity-60",
                   kind === "expense"
-                    ? "bg-white text-[#b38c19] shadow-sm"
+                    ? "text-[#b38c19]"
                     : "text-[#817861] hover:text-[#5f5848]",
                 )}
                 aria-label="Selecionar tipo despesa"
                 aria-pressed={kind === "expense"}
                 {...hoverButtonMotion}
               >
-                Despesa
+                {kind === "expense" ? (
+                  <motion.span
+                    layoutId="expense-kind-pill"
+                    className="absolute inset-0 rounded-full bg-white shadow-sm"
+                    transition={kindToggleTransition}
+                  />
+                ) : null}
+                <span className="relative z-10">Despesa</span>
               </motion.button>
               <motion.button
                 type="button"
@@ -379,58 +404,159 @@ export default function ExpenseAddModal({
                 }}
                 disabled={isBusy}
                 className={cn(
-                  "h-9 flex-1 rounded-full text-xs font-semibold uppercase tracking-[0.12em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b38c19]/60 disabled:cursor-not-allowed disabled:opacity-60",
+                  "relative h-9 flex-1 rounded-full text-xs font-semibold uppercase tracking-[0.12em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b38c19]/60 disabled:cursor-not-allowed disabled:opacity-60",
                   kind === "income"
-                    ? "bg-white text-[#b38c19] shadow-sm"
+                    ? "text-[#b38c19]"
                     : "text-[#817861] hover:text-[#5f5848]",
                 )}
                 aria-label="Selecionar tipo receita"
                 aria-pressed={kind === "income"}
                 {...hoverButtonMotion}
               >
-                Receita
+                {kind === "income" ? (
+                  <motion.span
+                    layoutId="expense-kind-pill"
+                    className="absolute inset-0 rounded-full bg-white shadow-sm"
+                    transition={kindToggleTransition}
+                  />
+                ) : null}
+                <span className="relative z-10">Receita</span>
               </motion.button>
             </div>
 
-            <p className="mt-5 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b39b57]/80">
-              VALOR
-            </p>
+            <div className="mt-3 flex justify-center">
+              {prefersReducedMotion ? (
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8d846b]">
+                  {kind === "expense" ? "Saída registrada" : "Entrada registrada"}
+                </p>
+              ) : (
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.p
+                    key={kind}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                    className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8d846b]"
+                  >
+                    {kind === "expense" ? "Saída registrada" : "Entrada registrada"}
+                  </motion.p>
+                </AnimatePresence>
+              )}
+            </div>
 
-            <div className="mt-2 flex justify-center">
-              <span
-                ref={mirrorRef}
-                aria-hidden="true"
-                className={cn(
-                  "pointer-events-none invisible fixed whitespace-pre font-bold tracking-[-0.03em] tabular-nums leading-[1]",
-                  getAmountSizeClasses(displayAmount),
-                )}
-              >
-                {displayAmount}
-              </span>
+            {prefersReducedMotion ? (
+              <p className="mt-5 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b39b57]/80">
+                VALOR
+              </p>
+            ) : (
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.p
+                  key={`value-label-${kind}`}
+                  initial={{ opacity: 0, y: 5, letterSpacing: "0.24em" }}
+                  animate={{ opacity: 1, y: 0, letterSpacing: "0.2em" }}
+                  exit={{ opacity: 0, y: -5, letterSpacing: "0.24em" }}
+                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                  className="mt-5 text-center text-[10px] font-semibold uppercase text-[#b39b57]/80"
+                >
+                  VALOR
+                </motion.p>
+              </AnimatePresence>
+            )}
 
-              <div className="inline-flex items-baseline gap-1">
-                <span className="text-[18px] leading-none font-light text-[#171611]/40 sm:text-[20px]">
-                  R$
-                </span>
-                <Input
-                  ref={inputRef}
-                  value={amountInput}
-                  onChange={(event) => setAmountInput(formatAmountInput(event.target.value))}
-                  placeholder="0,00"
-                  inputMode="decimal"
-                  disabled={isBusy}
-                  style={{ width: 80 }}
+            {prefersReducedMotion ? (
+              <div className="mt-2 flex justify-center">
+                <span
+                  ref={mirrorRef}
+                  aria-hidden="true"
                   className={cn(
-                    "h-18 min-w-0 border-0 bg-transparent px-0 text-left leading-[1] font-bold tracking-[-0.03em] tabular-nums text-[#171611] placeholder:text-[#171611]/35 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-70 sm:h-20",
+                    "pointer-events-none invisible fixed whitespace-pre font-bold tracking-[-0.03em] tabular-nums leading-[1]",
                     getAmountSizeClasses(displayAmount),
                   )}
-                  aria-label="Valor da transação"
-                />
+                >
+                  {displayAmount}
+                </span>
+
+                <div className="inline-flex items-baseline gap-1">
+                  <span className="text-[18px] leading-none font-light text-[#171611]/40 sm:text-[20px]">
+                    R$
+                  </span>
+                  <Input
+                    ref={inputRef}
+                    value={amountInput}
+                    onChange={(event) => setAmountInput(formatAmountInput(event.target.value))}
+                    placeholder="0,00"
+                    inputMode="decimal"
+                    disabled={isBusy}
+                    style={{ width: 80 }}
+                    className={cn(
+                      "h-18 min-w-0 border-0 bg-transparent px-0 text-left leading-[1] font-bold tracking-[-0.03em] tabular-nums text-[#171611] placeholder:text-[#171611]/35 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-70 sm:h-20",
+                      getAmountSizeClasses(displayAmount),
+                    )}
+                    aria-label="Valor da transação"
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={`value-input-${kind}`}
+                  initial={{ opacity: 0, y: 8, scale: 0.985 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.985 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="mt-2 flex justify-center"
+                >
+                  <span
+                    ref={mirrorRef}
+                    aria-hidden="true"
+                    className={cn(
+                      "pointer-events-none invisible fixed whitespace-pre font-bold tracking-[-0.03em] tabular-nums leading-[1]",
+                      getAmountSizeClasses(displayAmount),
+                    )}
+                  >
+                    {displayAmount}
+                  </span>
+
+                  <div className="inline-flex items-baseline gap-1">
+                    <motion.span
+                      initial={{ opacity: 0.6, y: 2 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                      className="text-[18px] leading-none font-light text-[#171611]/40 sm:text-[20px]"
+                    >
+                      R$
+                    </motion.span>
+                    <Input
+                      ref={inputRef}
+                      value={amountInput}
+                      onChange={(event) => setAmountInput(formatAmountInput(event.target.value))}
+                      placeholder="0,00"
+                      inputMode="decimal"
+                      disabled={isBusy}
+                      style={{ width: 80 }}
+                      className={cn(
+                        "h-18 min-w-0 border-0 bg-transparent px-0 text-left leading-[1] font-bold tracking-[-0.03em] tabular-nums text-[#171611] placeholder:text-[#171611]/35 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-70 sm:h-20",
+                        getAmountSizeClasses(displayAmount),
+                      )}
+                      aria-label="Valor da transação"
+                    />
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            )}
           </motion.section>
 
-          <motion.section
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={`kind-form-content-${kind}`}
+              className="space-y-4"
+              initial={kindContentMotion.initial}
+              animate={kindContentMotion.animate}
+              exit={kindContentMotion.exit}
+              transition={kindContentMotion.transition}
+            >
+              <motion.section
             className="rounded-3xl border border-[#e8e3da] bg-white p-4 sm:p-5"
             {...sectionReveal}
           >
@@ -738,6 +864,8 @@ export default function ExpenseAddModal({
               "Confirmar transação"
             )}
           </motion.button>
+            </motion.div>
+          </AnimatePresence>
         </form>
       </motion.div>
     </motion.div>
