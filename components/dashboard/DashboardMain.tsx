@@ -914,7 +914,7 @@ export default function DashboardMain() {
             totalLabel={spendingSummary.totalLabel}
           />
 
-          <div className={filteredCards.length < 3 ? "xl:col-span-3" : "xl:col-span-2"}>
+          <div className="xl:col-span-3">
             <ActiveCardsPanel cards={filteredCards} />
           </div>
         </motion.section>

@@ -23,7 +23,7 @@ export default function SpendingCategoryCard({
   ).stops;
 
   return (
-    <article className="rounded-3xl border border-white/60 bg-white/75 p-5 shadow-[0px_4px_20px_-2px_rgba(179,140,25,0.1),0px_2px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-[6px]">
+    <article className="flex h-full max-h-[520px] flex-col overflow-hidden rounded-3xl border border-white/60 bg-white/75 p-5 shadow-[0px_4px_20px_-2px_rgba(179,140,25,0.1),0px_2px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-[6px]">
       <h3 className="text-xl font-bold text-[#171611]">Categoria de gastos</h3>
 
       <div className="mt-6 flex justify-center">
@@ -38,7 +38,7 @@ export default function SpendingCategoryCard({
         </div>
       </div>
 
-      <ul className="mt-6 space-y-3">
+      <ul className="mt-6 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
         {categories.map((category) => (
           <li key={category.id} className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2 text-[#171611]">
