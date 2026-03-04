@@ -3,8 +3,12 @@
 import { dashboardNavItems } from "@/components/dashboard/dashboard-mock-data";
 import type { NavItemId } from "@/components/dashboard/types";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import {
+  FinancePrivacyProvider,
+  useFinancePrivacy,
+} from "@/src/contexts/finance-privacy-context";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { Eye, EyeOff, Menu, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 type DashboardLayoutProps = {
@@ -20,8 +24,31 @@ export default function DashboardLayout({
   activeNavId,
   children,
 }: DashboardLayoutProps) {
+  return (
+    <FinancePrivacyProvider>
+      <DashboardLayoutShell
+        userName={userName}
+        userEmail={userEmail}
+        activeNavId={activeNavId}
+      >
+        {children}
+      </DashboardLayoutShell>
+    </FinancePrivacyProvider>
+  );
+}
+
+function DashboardLayoutShell({
+  userName,
+  userEmail,
+  activeNavId,
+  children,
+}: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const prefersReducedMotion = useReducedMotion();
+  const { isSensitiveHidden, toggleSensitiveVisibility } = useFinancePrivacy();
+  const privacyToggleLabel = isSensitiveHidden
+    ? "Mostrar valores sensíveis"
+    : "Ocultar valores sensíveis";
 
   useEffect(() => {
     if (!sidebarOpen) {
@@ -51,7 +78,16 @@ export default function DashboardLayout({
           Fluxy
         </div>
 
-        <div className="h-10 w-10" aria-hidden />
+        <button
+          type="button"
+          onClick={toggleSensitiveVisibility}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#ece7dc] text-[#171611]"
+          aria-label={privacyToggleLabel}
+          title={privacyToggleLabel}
+          aria-pressed={isSensitiveHidden}
+        >
+          {isSensitiveHidden ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+        </button>
       </header>
 
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[304px] md:block">
