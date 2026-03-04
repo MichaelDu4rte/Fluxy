@@ -132,6 +132,8 @@ export default function WalletMain() {
   const [searchValue, setSearchValue] = useState("");
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
   const [sortMode, setSortMode] = useState<WalletSortMode>("allocation-desc");
+  const [dateFrom, setDateFrom] = useState(() => getMonthRange(new Date()).start);
+  const [dateTo, setDateTo] = useState(() => getMonthRange(new Date()).end);
 
   const [editingCard, setEditingCard] = useState<CardDto | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<CardDto | null>(null);
@@ -454,6 +456,10 @@ export default function WalletMain() {
       (acc, flow) => acc + flow.settledOutflowMonthCents,
       0,
     );
+    const currentSpentCents = Array.from(flowByAccount.values()).reduce(
+      (acc, flow) => acc + flow.outflowMonthCents,
+      0,
+    );
 
     const currentNetMonth = Array.from(flowByAccount.values()).reduce(
       (acc, flow) => acc + flow.currentNetMonthCents,
@@ -469,6 +475,8 @@ export default function WalletMain() {
     const nextSummary: WalletPortfolioSummaryVm = {
       totalPortfolioCents: totalAumCents,
       totalPortfolioLabel: formatCurrency(totalAumCents),
+      currentSpentCents,
+      currentSpentLabel: formatCurrency(currentSpentCents),
       monthChangePct,
       monthChangeLabel: `${monthChangePct >= 0 ? "+" : ""}${monthChangePct.toFixed(1)}%`,
       efficiencyPct: clamp(
@@ -579,6 +587,20 @@ export default function WalletMain() {
     }
   }
 
+  function handleDateFromChange(value: string) {
+    setDateFrom(value);
+    if (value && dateTo && value > dateTo) {
+      setDateTo(value);
+    }
+  }
+
+  function handleDateToChange(value: string) {
+    setDateTo(value);
+    if (value && dateFrom && value < dateFrom) {
+      setDateFrom(value);
+    }
+  }
+
   return (
     <main className="relative min-w-0 flex-1 overflow-x-hidden bg-[linear-gradient(134.5deg,#f8f7f6_0%,#eceae5_100%)]">
       <div className="mx-auto w-full max-w-[1440px] space-y-6 p-4 sm:p-6 lg:p-8">
@@ -608,7 +630,13 @@ export default function WalletMain() {
           </div>
         ) : (
           <>
-            <WalletPortfolioOverview summary={summary} />
+            <WalletPortfolioOverview
+              summary={summary}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              onDateFromChange={handleDateFromChange}
+              onDateToChange={handleDateToChange}
+            />
             <WalletPerformanceTable
               rows={performanceRows}
               sortMode={sortMode}

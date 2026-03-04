@@ -72,6 +72,8 @@ export type WalletSortMode =
 export type WalletPortfolioSummaryVm = {
   totalPortfolioCents: number;
   totalPortfolioLabel: string;
+  currentSpentCents: number;
+  currentSpentLabel: string;
   monthChangePct: number;
   monthChangeLabel: string;
   efficiencyPct: number;
