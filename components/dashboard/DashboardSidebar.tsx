@@ -3,7 +3,17 @@
 import LogoutButton from "@/app/(app)/dashboard/LogoutButton";
 import type { NavItem, NavItemId } from "@/components/dashboard/types";
 import { cn } from "@/lib/utils";
-import { ArrowLeftRight, LayoutDashboard, Lock, Settings, Wallet, Waypoints } from "lucide-react";
+import { useFinancePrivacy } from "@/src/contexts/finance-privacy-context";
+import {
+  ArrowLeftRight,
+  Eye,
+  EyeOff,
+  LayoutDashboard,
+  Lock,
+  Settings,
+  Wallet,
+  Waypoints,
+} from "lucide-react";
 import { Playfair_Display } from "next/font/google";
 import Link from "next/link";
 import type { ComponentType } from "react";
@@ -40,6 +50,10 @@ export default function DashboardSidebar({
   onNavigate,
 }: DashboardSidebarProps) {
   const userInitial = userName.trim().charAt(0).toUpperCase() || "A";
+  const { isSensitiveHidden, toggleSensitiveVisibility } = useFinancePrivacy();
+  const privacyToggleLabel = isSensitiveHidden
+    ? "Mostrar valores sensíveis"
+    : "Ocultar valores sensíveis";
 
   return (
     <aside
@@ -85,6 +99,7 @@ export default function DashboardSidebar({
             );
           })}
         </nav>
+
       </div>
 
       <div className="border-t border-[#efeae0] px-6 py-4">
@@ -97,12 +112,29 @@ export default function DashboardSidebar({
               <span className="text-sm font-semibold text-[#171611]">{userName}</span>
             </div>
           </div>
-          <LogoutButton
-            label="Sair da conta"
-            variant="ghost"
-            iconOnly
-            className="h-10 w-10 justify-center rounded-full text-[#7a6120] hover:bg-[#f2ece0] hover:text-[#171611]"
-          />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={toggleSensitiveVisibility}
+              className={cn(
+                "inline-flex h-10 w-10 items-center justify-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b38c19]/35",
+                isSensitiveHidden
+                  ? "bg-[#efe8d8] text-[#7a6120]"
+                  : "text-[#8b836d] hover:bg-[#f2ece0] hover:text-[#5b5444]",
+              )}
+              aria-label={privacyToggleLabel}
+              title={privacyToggleLabel}
+              aria-pressed={isSensitiveHidden}
+            >
+              {isSensitiveHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+            <LogoutButton
+              label="Sair da conta"
+              variant="ghost"
+              iconOnly
+              className="h-10 w-10 justify-center rounded-full text-[#7a6120] hover:bg-[#f2ece0] hover:text-[#171611]"
+            />
+          </div>
         </div>
       </div>
     </aside>
