@@ -53,31 +53,17 @@ export default function WalletHeaderBar({
               key={option.value}
               type="button"
               onClick={() => onStatusFilterChange(option.value)}
-              className={`h-8 rounded-xl px-3 text-xs font-semibold transition ${
-                statusFilter === option.value
-                  ? "bg-white text-[#9f7b17] shadow-sm"
-                  : "text-[#7d7665] hover:text-[#5b5444]"
-              }`}
+              className={`h-8 rounded-xl px-3 text-xs font-semibold transition ${statusFilter === option.value
+                ? "bg-white text-[#9f7b17] shadow-sm"
+                : "text-[#7d7665] hover:text-[#5b5444]"
+                }`}
             >
               {option.label}
             </button>
           ))}
         </div>
 
-        <div className="text-right">
-          <p className="text-xs uppercase tracking-[0.12em] text-[#8f866f]">Patrimonio total</p>
-          <p className="text-lg font-semibold text-[#1b1913] sm:text-xl">{totalPortfolioLabel}</p>
-        </div>
 
-        <Button
-          type="button"
-          onClick={onOpenCreate}
-          className="h-11 rounded-2xl bg-[#b38c19] px-4 text-sm font-semibold text-white hover:bg-[#9f7b17]"
-          aria-label="Abrir cadastro de conta ou cartao"
-        >
-          <Wallet className="mr-2 h-4 w-4" />
-          Transferencia de capital
-        </Button>
       </div>
     </section>
   );

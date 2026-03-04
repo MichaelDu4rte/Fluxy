@@ -39,11 +39,8 @@ export default function WalletPerformanceTable({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-2xl font-semibold tracking-[-0.02em] text-[#171611]">
-            Métricas de performance
+            Seus cartões
           </h3>
-          <p className="text-xs uppercase tracking-[0.12em] text-[#8d846b]">
-            Análise comparativa dos instrumentos de crédito ativos
-          </p>
         </div>
 
         <DropdownMenu>
@@ -140,7 +137,6 @@ export default function WalletPerformanceTable({
                         aria-label={`Editar ${row.accountName}`}
                       >
                         <Pencil className="mr-1 h-3.5 w-3.5" />
-                        Editar
                       </button>
                       <button
                         type="button"
@@ -154,7 +150,6 @@ export default function WalletPerformanceTable({
                         ) : (
                           <>
                             <Trash2 className="mr-1 h-3.5 w-3.5" />
-                            Deletar
                           </>
                         )}
                       </button>

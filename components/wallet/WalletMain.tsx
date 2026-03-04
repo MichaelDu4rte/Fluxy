@@ -29,7 +29,7 @@ import type {
   WalletPortfolioSummaryVm,
   WalletSortMode,
 } from "@/components/wallet/types";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -656,6 +656,18 @@ export default function WalletMain() {
           </>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          setEditingCard(null);
+          setIsCreateOpen(true);
+        }}
+        className="fixed bottom-6 right-6 z-30 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#b38c19] text-white shadow-[0px_14px_28px_-10px_rgba(179,140,25,0.75)] transition hover:bg-[#9f7b17]"
+        aria-label="Adicionar conta ou investimento"
+      >
+        <Plus className="h-5 w-5" />
+      </button>
 
       <WalletCreateModal
         open={isCreateOpen}

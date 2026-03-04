@@ -30,9 +30,6 @@ export default function WalletStrategicHoldings({
           <h3 className="text-2xl font-semibold tracking-[-0.02em] text-[#171611]">
             Lista de ativos estratégicos
           </h3>
-          <p className="text-xs uppercase tracking-[0.12em] text-[#8d846b]">
-            Análise detalhada da alocação de capital
-          </p>
         </div>
 
         <button
