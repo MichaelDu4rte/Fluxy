@@ -5,6 +5,9 @@ import { expenseCategoryLabels } from "@/components/expenses/expense-mock-data";
 import type {
   CardSummary,
   KpiCard,
+  PortfolioChangeTone,
+  PortfolioPoint,
+  PortfolioSummary,
   SpendingCategory,
   Transaction,
   TransactionIcon,
@@ -285,6 +288,43 @@ function formatPercentChange(current: number, previous: number) {
   return `${signal}${value.toFixed(1)}%`;
 }
 
+function calculateSignedPercentChange(current: number, previous: number) {
+  if (previous === 0) {
+    if (current === 0) {
+      return 0;
+    }
+    return current > 0 ? 100 : -100;
+  }
+
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+function formatSignedPercent(value: number) {
+  const signal = value > 0 ? "+" : "";
+  return `${signal}${value.toFixed(1)}%`;
+}
+
+function toPortfolioChangeTone(value: number): PortfolioChangeTone {
+  if (value > 0) {
+    return "positive";
+  }
+  if (value < 0) {
+    return "negative";
+  }
+  return "neutral";
+}
+
+function formatSignedCurrencyFromCents(cents: number) {
+  const absoluteLabel = formatCurrencyWithDecimalsFromCents(Math.abs(cents));
+  if (cents > 0) {
+    return `+${absoluteLabel}`;
+  }
+  if (cents < 0) {
+    return `-${absoluteLabel}`;
+  }
+  return absoluteLabel;
+}
+
 function getSectionVariants(reduceMotion: boolean): {
   container: Variants;
   section: Variants;
@@ -454,37 +494,199 @@ function buildSpendingSummary(filteredTransactions: DashboardTransaction[]): {
   };
 }
 
-function buildPortfolioPoints(transactions: DashboardTransaction[]) {
-  const now = new Date();
-  const points: Array<{ label: string; value: number }> = [];
-  let cumulative = 0;
+function normalizeDateRange(dateFrom: string, dateTo: string) {
+  const defaults = getCurrentMonthDateRange();
+  const normalizedDateFrom = isISODate(dateFrom) ? dateFrom : defaults.dateFrom;
+  const normalizedDateTo = isISODate(dateTo) ? dateTo : defaults.dateTo;
 
-  for (let offset = 8; offset >= 0; offset -= 1) {
-    const monthStart = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() - offset + 1, 1);
+  if (normalizedDateFrom <= normalizedDateTo) {
+    return {
+      dateFrom: normalizedDateFrom,
+      dateTo: normalizedDateTo,
+    };
+  }
 
-    const monthlyNet = transactions.reduce((acc, transaction) => {
-      const occurredAt = new Date(transaction.occurredAtISO);
-      if (occurredAt < monthStart || occurredAt >= nextMonthStart) {
-        return acc;
-      }
+  return {
+    dateFrom: normalizedDateTo,
+    dateTo: normalizedDateFrom,
+  };
+}
 
-      return acc + (transaction.kind === "income" ? transaction.amountValue : -transaction.amountValue);
-    }, 0);
+function toSignedAmount(transaction: DashboardTransaction) {
+  return transaction.kind === "income" ? transaction.amountValue : -transaction.amountValue;
+}
 
-    cumulative += monthlyNet;
+function sumNetCents(transactions: DashboardTransaction[]) {
+  return transactions.reduce((acc, transaction) => acc + toSignedAmount(transaction), 0);
+}
 
-    const shortLabel = monthStart
-      .toLocaleDateString("pt-BR", { month: "short" })
-      .replace(".", "");
+function formatDailyPointLabel(dateISO: string) {
+  const date = new Date(`${dateISO}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return "--";
+  }
 
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
+function formatMonthlyPointLabel(monthKey: string) {
+  const monthDate = new Date(`${monthKey}-01T00:00:00`);
+  if (Number.isNaN(monthDate.getTime())) {
+    return "--";
+  }
+
+  const shortLabel = monthDate
+    .toLocaleDateString("pt-BR", { month: "short" })
+    .replace(".", "");
+
+  return shortLabel.charAt(0).toUpperCase() + shortLabel.slice(1, 3);
+}
+
+function buildDailyPortfolioPoints(
+  filteredTransactions: DashboardTransaction[],
+  dateFrom: string,
+  dateTo: string,
+) {
+  const netByDate = new Map<string, number>();
+
+  for (const transaction of filteredTransactions) {
+    const current = netByDate.get(transaction.occurredDateISO) ?? 0;
+    netByDate.set(transaction.occurredDateISO, current + toSignedAmount(transaction));
+  }
+
+  const points: PortfolioPoint[] = [];
+  let cumulativeCents = 0;
+  let cursor = dateFrom;
+
+  while (cursor <= dateTo) {
+    cumulativeCents += netByDate.get(cursor) ?? 0;
     points.push({
-      label: shortLabel.charAt(0).toUpperCase() + shortLabel.slice(1, 3),
-      value: Number((cumulative / 100).toFixed(2)),
+      label: formatDailyPointLabel(cursor),
+      value: Number((cumulativeCents / 100).toFixed(2)),
     });
+    cursor = addDays(cursor, 1);
   }
 
   return points;
+}
+
+function buildMonthlyPortfolioPoints(
+  filteredTransactions: DashboardTransaction[],
+  dateFrom: string,
+  dateTo: string,
+) {
+  const netByMonth = new Map<string, number>();
+
+  for (const transaction of filteredTransactions) {
+    const monthKey = transaction.occurredDateISO.slice(0, 7);
+    const current = netByMonth.get(monthKey) ?? 0;
+    netByMonth.set(monthKey, current + toSignedAmount(transaction));
+  }
+
+  const points: PortfolioPoint[] = [];
+  let cumulativeCents = 0;
+
+  const cursor = new Date(`${dateFrom}T00:00:00`);
+  const end = new Date(`${dateTo}T00:00:00`);
+  cursor.setDate(1);
+  end.setDate(1);
+
+  while (cursor <= end) {
+    const monthKey = `${cursor.getFullYear()}-${`${cursor.getMonth() + 1}`.padStart(2, "0")}`;
+    cumulativeCents += netByMonth.get(monthKey) ?? 0;
+
+    points.push({
+      label: formatMonthlyPointLabel(monthKey),
+      value: Number((cumulativeCents / 100).toFixed(2)),
+    });
+
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return points;
+}
+
+function downsamplePortfolioPoints(points: PortfolioPoint[], maxPoints = 12) {
+  if (points.length <= maxPoints) {
+    return points;
+  }
+
+  const sampled: PortfolioPoint[] = [points[0]];
+  const step = (points.length - 1) / (maxPoints - 1);
+  let lastSampledIndex = 0;
+
+  for (let index = 1; index < maxPoints - 1; index += 1) {
+    let sampledIndex = Math.round(index * step);
+
+    if (sampledIndex <= lastSampledIndex) {
+      sampledIndex = lastSampledIndex + 1;
+    }
+
+    if (sampledIndex >= points.length - 1) {
+      sampledIndex = points.length - 2;
+    }
+
+    sampled.push(points[sampledIndex]);
+    lastSampledIndex = sampledIndex;
+  }
+
+  sampled.push(points[points.length - 1]);
+  return sampled;
+}
+
+function buildPortfolioData(params: {
+  filteredTransactions: DashboardTransaction[];
+  cardAndTagFilteredTransactions: DashboardTransaction[];
+  dateFrom: string;
+  dateTo: string;
+}): {
+  points: PortfolioPoint[];
+  summary: PortfolioSummary;
+} {
+  const { filteredTransactions, cardAndTagFilteredTransactions, dateFrom, dateTo } = params;
+  const normalizedRange = normalizeDateRange(dateFrom, dateTo);
+  const periodLength = getDaysDiffInclusive(normalizedRange.dateFrom, normalizedRange.dateTo);
+  const useDailyGranularity = periodLength <= 45;
+
+  const rawPoints = useDailyGranularity
+    ? buildDailyPortfolioPoints(
+      filteredTransactions,
+      normalizedRange.dateFrom,
+      normalizedRange.dateTo,
+    )
+    : buildMonthlyPortfolioPoints(
+      filteredTransactions,
+      normalizedRange.dateFrom,
+      normalizedRange.dateTo,
+    );
+
+  const periodNetCents = sumNetCents(filteredTransactions);
+  const previousDateTo = addDays(normalizedRange.dateFrom, -1);
+  const previousDateFrom = addDays(previousDateTo, -(periodLength - 1));
+
+  const previousPeriodTransactions = cardAndTagFilteredTransactions.filter((transaction) => (
+    transaction.occurredDateISO >= previousDateFrom
+    && transaction.occurredDateISO <= previousDateTo
+  ));
+
+  const previousPeriodNetCents = sumNetCents(previousPeriodTransactions);
+  const periodChangePct = calculateSignedPercentChange(periodNetCents, previousPeriodNetCents);
+
+  return {
+    points: downsamplePortfolioPoints(rawPoints, 12),
+    summary: {
+      periodNetCents,
+      periodNetLabel: formatSignedCurrencyFromCents(periodNetCents),
+      previousPeriodNetCents,
+      periodChangePct,
+      periodChangeLabel: formatSignedPercent(periodChangePct),
+      periodChangeTone: toPortfolioChangeTone(periodChangePct),
+      subtitle: "Resultado liquido no periodo selecionado",
+    },
+  };
 }
 
 export default function DashboardMain() {
@@ -662,9 +864,20 @@ export default function DashboardMain() {
     [filteredTransactions],
   );
 
-  const portfolioPoints = useMemo(
-    () => buildPortfolioPoints(cardAndTagFilteredTransactions),
-    [cardAndTagFilteredTransactions],
+  const portfolioData = useMemo(
+    () =>
+      buildPortfolioData({
+        filteredTransactions,
+        cardAndTagFilteredTransactions,
+        dateFrom: dateRange.dateFrom,
+        dateTo: dateRange.dateTo,
+      }),
+    [
+      cardAndTagFilteredTransactions,
+      dateRange.dateFrom,
+      dateRange.dateTo,
+      filteredTransactions,
+    ],
   );
 
   const cardsForAvailableBalance = useMemo(() => {
@@ -906,7 +1119,7 @@ export default function DashboardMain() {
 
         <motion.section variants={variants.section} className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <div className="xl:col-span-2">
-            <PortfolioChartCard points={portfolioPoints} />
+            <PortfolioChartCard points={portfolioData.points} summary={portfolioData.summary} />
           </div>
 
           <SpendingCategoryCard

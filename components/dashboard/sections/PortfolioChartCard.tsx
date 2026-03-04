@@ -1,21 +1,24 @@
-import type { PortfolioPoint } from "@/components/dashboard/types";
+import type { PortfolioPoint, PortfolioSummary } from "@/components/dashboard/types";
 
 type PortfolioChartCardProps = {
   points: PortfolioPoint[];
+  summary: PortfolioSummary;
 };
 
-export default function PortfolioChartCard({ points }: PortfolioChartCardProps) {
+export default function PortfolioChartCard({ points, summary }: PortfolioChartCardProps) {
+  const safePoints = points.length > 0 ? points : [{ label: "--", value: 0 }];
   const width = 720;
   const height = 260;
   const xPadding = 8;
   const yPadding = 14;
 
-  const minValue = Math.min(...points.map((point) => point.value));
-  const maxValue = Math.max(...points.map((point) => point.value));
+  const minValue = Math.min(...safePoints.map((point) => point.value));
+  const maxValue = Math.max(...safePoints.map((point) => point.value));
   const spread = maxValue - minValue || 1;
+  const horizontalSteps = Math.max(1, safePoints.length - 1);
 
-  const coordinates = points.map((point, index) => {
-    const x = xPadding + (index * (width - xPadding * 2)) / (points.length - 1);
+  const coordinates = safePoints.map((point, index) => {
+    const x = xPadding + (index * (width - xPadding * 2)) / horizontalSteps;
     const y =
       height -
       yPadding -
@@ -30,17 +33,31 @@ export default function PortfolioChartCard({ points }: PortfolioChartCardProps) 
 
   const areaPath = `${linePath} L${coordinates[coordinates.length - 1].x} ${height - yPadding} L${coordinates[0].x} ${height - yPadding} Z`;
 
+  const metricToneClass =
+    summary.periodChangeTone === "negative"
+      ? "text-rose-700"
+      : summary.periodChangeTone === "neutral"
+        ? "text-[#7f7761]"
+        : "text-[#b38c19]";
+
+  const changeToneClass =
+    summary.periodChangeTone === "negative"
+      ? "bg-rose-100 text-rose-700"
+      : summary.periodChangeTone === "neutral"
+        ? "bg-stone-200 text-stone-700"
+        : "bg-emerald-100 text-emerald-700";
+
   return (
     <article className="rounded-3xl border border-white/60 bg-white/75 p-5 shadow-[0px_4px_20px_-2px_rgba(179,140,25,0.1),0px_2px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-[6px]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-xl font-bold text-[#171611]">Crescimento do portfólio</h3>
-          <p className="text-sm text-[#877e64]">Desempenho no ano</p>
+          <h3 className="text-xl font-bold text-[#171611]">Crescimento do portfolio</h3>
+          <p className="text-sm text-[#877e64]">{summary.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold text-[#b38c19]">+$125,000</span>
-          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-            +12.5%
+          <span className={`text-2xl font-bold ${metricToneClass}`}>{summary.periodNetLabel}</span>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${changeToneClass}`}>
+            {summary.periodChangeLabel}
           </span>
         </div>
       </div>
@@ -85,9 +102,12 @@ export default function PortfolioChartCard({ points }: PortfolioChartCardProps) 
           />
         </svg>
 
-        <div className="mt-2 grid grid-cols-9 text-center text-[11px] font-medium uppercase tracking-wide text-[#877e64]">
-          {points.map((point) => (
-            <span key={point.label}>{point.label}</span>
+        <div
+          className="mt-2 grid text-center text-[11px] font-medium uppercase tracking-wide text-[#877e64]"
+          style={{ gridTemplateColumns: `repeat(${safePoints.length}, minmax(0, 1fr))` }}
+        >
+          {safePoints.map((point, index) => (
+            <span key={`${point.label}-${index}`}>{point.label}</span>
           ))}
         </div>
       </div>

@@ -30,6 +30,18 @@ export type PortfolioPoint = {
   value: number;
 };
 
+export type PortfolioChangeTone = "positive" | "negative" | "neutral";
+
+export type PortfolioSummary = {
+  periodNetCents: number;
+  periodNetLabel: string;
+  previousPeriodNetCents: number;
+  periodChangePct: number;
+  periodChangeLabel: string;
+  periodChangeTone: PortfolioChangeTone;
+  subtitle: string;
+};
+
 export type FinancialHealthMetric = {
   label: string;
   value: string;
