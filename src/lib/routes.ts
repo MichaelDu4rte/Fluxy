@@ -10,6 +10,7 @@ export const PROTECTED_PREFIXES = [
   "/transacoes",
   "/despesas",
   "/carteira",
+  "/integracoes",
   "/settings",
   "/app",
 ] as const;

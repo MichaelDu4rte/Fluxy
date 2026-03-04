@@ -25,6 +25,8 @@ model User {
   accounts      Account[]
   financialAccounts     FinancialAccount[]
   financialTransactions FinancialTransaction[]
+  telegramLink          TelegramLink?
+  telegramLinkCodes     TelegramLinkCode[]
 
   @@unique([email])
   @@map("user")
@@ -153,4 +155,46 @@ model FinancialTransaction {
   @@index([accountId, occurredAt(sort: Desc)])
   @@index([userId, seriesId])
   @@map("financial_transaction")
+}
+
+model TelegramLink {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatId     BigInt   @unique
+  chatType   String
+  username   String?
+  firstName  String?
+  lastName   String?
+  isActive   Boolean  @default(true)
+  linkedAt   DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, isActive])
+  @@map("telegram_link")
+}
+
+model TelegramLinkCode {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+  @@map("telegram_link_code")
+}
+
+model TelegramUpdateLog {
+  id        String   @id @default(cuid())
+  updateId  BigInt   @unique
+  chatId    BigInt?
+  createdAt DateTime @default(now())
+
+  @@index([chatId])
+  @@map("telegram_update_log")
 }

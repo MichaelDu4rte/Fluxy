@@ -15,8 +15,8 @@ export const dashboardNavItems: NavItem[] = [
   { id: "wallet", label: "Carteira", href: "/carteira" },
   {
     id: "settings",
-    label: "Configurações",
-    href: "/dashboard?section=settings",
+    label: "Integracoes",
+    href: "/integracoes/telegram",
   },
 ];
 
