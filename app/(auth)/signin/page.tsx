@@ -127,7 +127,7 @@ export default function LoginPage() {
       }
       heroSubtitle="Seu hub para contas, despesas e investimentos"
       heroFooterLeft="Fluxy"
-      heroFooterRight="Since 2024"
+      heroFooterRight="Entrar"
       footerHref="/signup"
       footerLeadText="Ainda nao tem conta?"
       footerActionText="Criar conta gratis"
