@@ -1,3 +1,4 @@
+import SensitiveMoney from "@/components/finance/SensitiveMoney";
 import type { SpendingCategory } from "@/components/dashboard/types";
 
 type SpendingCategoryCardProps = {
@@ -33,7 +34,9 @@ export default function SpendingCategoryCard({
         >
           <div className="flex h-[116px] w-[116px] flex-col items-center justify-center rounded-full bg-[#f8f7f3]">
             <span className="text-[10px] uppercase tracking-[0.2em] text-[#877e64]">Total</span>
-            <span className="text-3xl font-bold tracking-[-0.03em] text-[#171611]">{totalLabel}</span>
+            <span className="text-3xl font-bold tracking-[-0.03em] text-[#171611]">
+              <SensitiveMoney>{totalLabel}</SensitiveMoney>
+            </span>
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
-﻿import type { CardSummary } from "@/components/dashboard/types";
+import SensitiveMoney from "@/components/finance/SensitiveMoney";
+import type { CardSummary } from "@/components/dashboard/types";
 import { CreditCard } from "lucide-react";
 
 type ActiveCardsPanelProps = {
@@ -32,7 +33,7 @@ export default function ActiveCardsPanel({ cards }: ActiveCardsPanelProps) {
               <div className="flex items-center justify-between text-xs">
                 <span className="text-white/65">Limite usado</span>
                 <span className="text-white">
-                  {card.usedLabel} / {card.limitLabel}
+                  <SensitiveMoney>{card.usedLabel} / {card.limitLabel}</SensitiveMoney>
                 </span>
               </div>
               <div className="h-1.5 rounded-full bg-white/15">

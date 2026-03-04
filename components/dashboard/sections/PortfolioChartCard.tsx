@@ -1,3 +1,4 @@
+import SensitiveMoney from "@/components/finance/SensitiveMoney";
 import type { PortfolioPoint, PortfolioSummary } from "@/components/dashboard/types";
 
 type PortfolioChartCardProps = {
@@ -55,7 +56,9 @@ export default function PortfolioChartCard({ points, summary }: PortfolioChartCa
           <p className="text-sm text-[#877e64]">{summary.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`text-2xl font-bold ${metricToneClass}`}>{summary.periodNetLabel}</span>
+          <span className={`text-2xl font-bold ${metricToneClass}`}>
+            <SensitiveMoney>{summary.periodNetLabel}</SensitiveMoney>
+          </span>
           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${changeToneClass}`}>
             {summary.periodChangeLabel}
           </span>

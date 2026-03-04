@@ -1,4 +1,5 @@
-﻿import type { ExpenseAccount, ExpenseItem } from "@/components/expenses/types";
+import SensitiveMoney from "@/components/finance/SensitiveMoney";
+import type { ExpenseAccount, ExpenseItem } from "@/components/expenses/types";
 import { AlertTriangle, CircleCheck, Wallet } from "lucide-react";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
@@ -99,7 +100,7 @@ export default function ExpenseSummaryCards({
               <div>
                 <p className="text-sm font-medium text-[#877e64]">{card.title}</p>
                 <p className={`mt-1 text-2xl font-bold tracking-[-0.03em] ${card.toneClass}`}>
-                  {card.value}
+                  <SensitiveMoney>{card.value}</SensitiveMoney>
                 </p>
               </div>
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#f3efe4] text-[#8d7116]">

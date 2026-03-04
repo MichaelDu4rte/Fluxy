@@ -1,3 +1,4 @@
+import SensitiveMoney from "@/components/finance/SensitiveMoney";
 import type { Transaction } from "@/components/dashboard/types";
 import { Plane, ShoppingBag, UtensilsCrossed } from "lucide-react";
 
@@ -72,7 +73,7 @@ export default function RecentTransactionsTable({
                   <td className="py-4 pr-6 text-sm text-[#877e64]">{transaction.category}</td>
                   <td className="py-4 pr-6 text-sm text-[#877e64]">{transaction.date}</td>
                   <td className="py-4 text-right text-sm font-medium text-[#171611]">
-                    {transaction.amount}
+                    <SensitiveMoney>{transaction.amount}</SensitiveMoney>
                   </td>
                 </tr>
               );

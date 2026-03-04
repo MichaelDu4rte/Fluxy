@@ -1,4 +1,5 @@
-﻿import {
+import SensitiveMoney from "@/components/finance/SensitiveMoney";
+import {
   expenseCategoryLabels,
   getExpenseStatusLabel,
 } from "@/components/expenses/expense-mock-data";
@@ -150,7 +151,7 @@ export default function ExpenseRow({ expense, onClick }: ExpenseRowProps) {
             expense.kind === "income" ? "text-emerald-700" : "text-[#171611]",
           )}
         >
-          {getAmountLabel(expense)}
+          <SensitiveMoney>{getAmountLabel(expense)}</SensitiveMoney>
         </p>
         <p className="mt-0.5 text-xs text-[#877e64]">{expense.dateLabel}</p>
         <span

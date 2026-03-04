@@ -1,5 +1,6 @@
 "use client";
 
+import SensitiveMoney from "@/components/finance/SensitiveMoney";
 import type { WalletHoldingVm } from "@/components/wallet/types";
 import { cn } from "@/lib/utils";
 import { ArrowUpRight, CreditCard, Landmark, Pencil, Trash2, Wallet } from "lucide-react";
@@ -70,7 +71,10 @@ export default function WalletStrategicHoldings({
                   ) : null}
                   <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs uppercase tracking-[0.08em] text-[#7f7763]">
                     <span>
-                      AUM <strong className="ml-1 text-sm tracking-normal text-[#2c271f]">{item.aumLabel}</strong>
+                      AUM{" "}
+                      <strong className="ml-1 text-sm tracking-normal text-[#2c271f]">
+                        <SensitiveMoney>{item.aumLabel}</SensitiveMoney>
+                      </strong>
                     </span>
                     <span>
                       Alocação <strong className="ml-1 text-sm tracking-normal text-[#2c271f]">{item.allocationLabel}</strong>
@@ -80,12 +84,18 @@ export default function WalletStrategicHoldings({
                     <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#6f6754]">
                       {item.currentPriceLabel ? (
                         <span>
-                          Preço atual: <strong className="text-[#272218]">{item.currentPriceLabel}</strong>
+                          Preço atual:{" "}
+                          <strong className="text-[#272218]">
+                            <SensitiveMoney>{item.currentPriceLabel}</SensitiveMoney>
+                          </strong>
                         </span>
                       ) : null}
                       {item.entryPriceLabel ? (
                         <span>
-                          Preço de entrada: <strong className="text-[#272218]">{item.entryPriceLabel}</strong>
+                          Preço de entrada:{" "}
+                          <strong className="text-[#272218]">
+                            <SensitiveMoney>{item.entryPriceLabel}</SensitiveMoney>
+                          </strong>
                         </span>
                       ) : null}
                       {item.marketUpdatedAtLabel ? (

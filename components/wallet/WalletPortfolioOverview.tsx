@@ -1,5 +1,6 @@
 "use client";
 
+import SensitiveMoney from "@/components/finance/SensitiveMoney";
 import type { WalletPortfolioSummaryVm } from "@/components/wallet/types";
 import { cn } from "@/lib/utils";
 import { Info, TrendingDown, TrendingUp } from "lucide-react";
@@ -93,7 +94,7 @@ export default function WalletPortfolioOverview({
 
           <div className="flex flex-wrap items-end gap-3">
             <h2 className="text-4xl font-semibold tracking-[-0.03em] text-white sm:text-5xl">
-              {summary.totalPortfolioLabel}
+              <SensitiveMoney>{summary.totalPortfolioLabel}</SensitiveMoney>
             </h2>
             <span
               className={cn(
@@ -114,7 +115,9 @@ export default function WalletPortfolioOverview({
 
           <p className="text-sm font-medium text-white/70">
             Gasto atual:{" "}
-            <span className="font-semibold text-rose-200">{summary.currentSpentLabel}</span>
+            <span className="font-semibold text-rose-200">
+              <SensitiveMoney>{summary.currentSpentLabel}</SensitiveMoney>
+            </span>
           </p>
         </div>
 

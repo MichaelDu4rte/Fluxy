@@ -1,3 +1,4 @@
+import SensitiveMoney from "@/components/finance/SensitiveMoney";
 import type { KpiCard, KpiTone } from "@/components/dashboard/types";
 import { Landmark, PiggyBank, Wallet } from "lucide-react";
 
@@ -30,7 +31,9 @@ export default function KpiRow({ cards }: KpiRowProps) {
           >
             <div className="space-y-1">
               <p className="text-sm font-medium text-[#877e64]">{card.title}</p>
-              <p className="text-3xl font-bold tracking-[-0.02em] text-[#171611]">{card.value}</p>
+              <p className="text-3xl font-bold tracking-[-0.02em] text-[#171611]">
+                <SensitiveMoney>{card.value}</SensitiveMoney>
+              </p>
             </div>
 
             <div className="mt-3 flex items-center gap-2">

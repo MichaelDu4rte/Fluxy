@@ -7,6 +7,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import SensitiveMoney from "@/components/finance/SensitiveMoney";
 import type { WalletPerformanceRowVm, WalletSortMode } from "@/components/wallet/types";
 import { ArrowUpDown, Loader2, Pencil, Trash2 } from "lucide-react";
 
@@ -102,12 +103,18 @@ export default function WalletPerformanceTable({
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    <span className="font-semibold text-[#171611]">{row.availableBalanceLabel}</span>
+                    <span className="font-semibold text-[#171611]">
+                      <SensitiveMoney>{row.availableBalanceLabel}</SensitiveMoney>
+                    </span>
                   </td>
                   <td className="px-4 py-4">
-                    <span className="font-semibold text-[#3d3628]">{row.spentLabel}</span>
+                    <span className="font-semibold text-[#3d3628]">
+                      <SensitiveMoney>{row.spentLabel}</SensitiveMoney>
+                    </span>
                   </td>
-                  <td className="px-4 py-4 font-medium">{row.monthlyLimitLabel}</td>
+                  <td className="px-4 py-4 font-medium">
+                    <SensitiveMoney>{row.monthlyLimitLabel}</SensitiveMoney>
+                  </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
                       <div className="h-2 w-28 overflow-hidden rounded-full bg-[#ebe7dc]">
