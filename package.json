@@ -6,6 +6,7 @@
     "dev": "next dev",
     "realtime:dev": "node --watch realtime-server/server.mjs",
     "realtime:start": "node realtime-server/server.mjs",
+    "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
