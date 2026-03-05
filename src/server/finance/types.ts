@@ -64,6 +64,12 @@ export type TransactionsSummaryDto = {
   totalCount: number;
 };
 
+export type FinanceSnapshotDto = {
+  cards: CardDto[];
+  transactions: TransactionDto[];
+  summary: TransactionsSummaryDto;
+};
+
 export type CreateCardInput = {
   name: string;
   type: ApiFinancialAccountType;

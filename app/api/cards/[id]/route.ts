@@ -5,6 +5,7 @@ import {
   updateCardForUser,
 } from "@/src/server/finance/cards-service";
 import { assertObjectPayload, handleFinanceHttpError } from "@/src/server/finance/http";
+import { invalidateFinanceCacheForUser } from "@/src/server/finance/read-cache";
 import type { UpdateCardInput } from "@/src/server/finance/types";
 
 type RouteContext = {
@@ -80,6 +81,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     };
 
     const item = await updateCardForUser(userOrRedirect.id, id, input);
+    invalidateFinanceCacheForUser(userOrRedirect.id);
     return NextResponse.json({ item });
   } catch (error) {
     return handleFinanceHttpError(error);
@@ -98,6 +100,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     const { id } = await context.params;
     const result = await deleteCardForUser(userOrRedirect.id, id);
+    invalidateFinanceCacheForUser(userOrRedirect.id);
     return NextResponse.json(result);
   } catch (error) {
     return handleFinanceHttpError(error);

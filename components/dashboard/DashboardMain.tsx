@@ -27,10 +27,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { readCookieJson, writeCookieJson } from "@/src/lib/client-cookies";
+import {
+  invalidateFinanceSnapshotQuery,
+  useFinanceSnapshotQuery,
+} from "@/src/lib/queries/finance";
 import { useTelegramRealtimeRefresh } from "@/src/lib/realtime/useTelegramRealtimeRefresh";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { CalendarRange, ChevronDown, SlidersHorizontal } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const enterEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -70,13 +75,6 @@ type ApiTransactionDto = {
   occurredAt: string;
 };
 
-type ApiErrorResponse = {
-  error?: {
-    code?: string;
-    message?: string;
-  };
-};
-
 type DashboardTransaction = Transaction & {
   amountValue: number;
   kind: ApiTransactionKind;
@@ -84,17 +82,8 @@ type DashboardTransaction = Transaction & {
   occurredDateISO: string;
 };
 
-class ApiRequestError extends Error {
-  public readonly status: number;
-  public readonly code?: string;
-
-  constructor(message: string, status: number, code?: string) {
-    super(message);
-    this.name = "ApiRequestError";
-    this.status = status;
-    this.code = code;
-  }
-}
+const EMPTY_CARDS: ApiCardDto[] = [];
+const EMPTY_TRANSACTIONS: ApiTransactionDto[] = [];
 
 const categoryColorMap: Record<string, string> = {
   alimentacao: "#787F5B",
@@ -376,26 +365,6 @@ function getButtonClass(active: boolean) {
     "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
     active ? "bg-[#f6f4ef] text-[#171611]" : "text-[#171611] hover:bg-[#f6f4ef]",
   ].join(" ");
-}
-
-async function readApiJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-  });
-
-  const rawText = await response.text();
-  const parsed = rawText ? (JSON.parse(rawText) as unknown) : undefined;
-
-  if (!response.ok) {
-    const apiError = (parsed ?? {}) as ApiErrorResponse;
-    throw new ApiRequestError(
-      apiError.error?.message ?? "Falha ao carregar dados do painel.",
-      response.status,
-      apiError.error?.code,
-    );
-  }
-
-  return parsed as T;
 }
 
 function mapCardsToSummary(cards: ApiCardDto[]): CardSummary[] {
@@ -693,6 +662,8 @@ function buildPortfolioData(params: {
 export default function DashboardMain() {
   const prefersReducedMotion = useReducedMotion();
   const variants = getSectionVariants(Boolean(prefersReducedMotion));
+  const queryClient = useQueryClient();
+  const financeSnapshotQuery = useFinanceSnapshotQuery();
   const [hasRestoredFilters, setHasRestoredFilters] = useState(false);
 
   const [dateRange, setDateRange] = useState(() => ({
@@ -700,64 +671,42 @@ export default function DashboardMain() {
   }));
   const [cardFilter, setCardFilter] = useState<CardFilter>("all");
   const [tagFilter, setTagFilter] = useState<TagFilter>("all");
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [cardsData, setCardsData] = useState<ApiCardDto[]>([]);
-  const [transactionsData, setTransactionsData] = useState<DashboardTransaction[]>([]);
-  const mountedRef = useRef(true);
+  const isLoading = financeSnapshotQuery.isLoading;
+  const cardsData = useMemo(
+    () => (financeSnapshotQuery.data?.cards ?? EMPTY_CARDS).filter((card) => card.isActive),
+    [financeSnapshotQuery.data?.cards],
+  );
+  const snapshotTransactions = financeSnapshotQuery.data?.transactions ?? EMPTY_TRANSACTIONS;
+  const transactionsData = useMemo(
+    () => mapTransactions(snapshotTransactions),
+    [snapshotTransactions],
+  );
 
   useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  const loadDashboardData = useCallback(async () => {
-    try {
-      const [cardsResponse, transactionsResponse] = await Promise.all([
-        readApiJson<{ items: ApiCardDto[] }>("/api/cards"),
-        readApiJson<{ items: ApiTransactionDto[] }>("/api/transactions"),
-      ]);
-
-      if (!mountedRef.current) {
-        return;
-      }
-
-      const cards = cardsResponse.items;
-      const transactions = mapTransactions(transactionsResponse.items);
-
-      setCardsData(cards);
-      setTransactionsData(transactions);
-    } catch (error) {
-      if (!mountedRef.current) {
-        return;
-      }
-
-      const message =
-        error instanceof ApiRequestError
-          ? error.message
-          : "Não foi possível carregar os dados reais do dashboard.";
-      toast.error(message);
-    } finally {
-      if (mountedRef.current) {
-        setIsLoading(false);
-      }
+    if (!financeSnapshotQuery.isError) {
+      return;
     }
-  }, []);
+
+    const message = financeSnapshotQuery.error instanceof Error
+      ? financeSnapshotQuery.error.message
+      : "Não foi possível carregar os dados reais do dashboard.";
+    toast.error(message);
+  }, [
+    financeSnapshotQuery.error,
+    financeSnapshotQuery.errorUpdatedAt,
+    financeSnapshotQuery.isError,
+  ]);
 
   const handleRealtimeRefresh = useCallback(async () => {
-    await loadDashboardData();
-  }, [loadDashboardData]);
+    await invalidateFinanceSnapshotQuery(queryClient);
+  }, [queryClient]);
 
   useTelegramRealtimeRefresh({
     onRefresh: handleRealtimeRefresh,
     toastMessage: "Nova despesa via Telegram.",
   });
 
-  useEffect(() => {
-    void loadDashboardData();
-  }, [loadDashboardData]);
-
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const defaults = {
       ...getCurrentMonthDateRange(),
@@ -835,6 +784,7 @@ export default function DashboardMain() {
       setTagFilter("all");
     }
   }, [tagFilter, tagOptions, isLoading]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const selectedCard = cardOptions.find((option) => option.value === cardFilter) ?? cardOptions[0];
   const selectedTag = tagOptions.find((option) => option.value === tagFilter) ?? tagOptions[0];

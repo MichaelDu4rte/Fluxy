@@ -26,7 +26,12 @@ import ExpensesHeader from "@/components/expenses/sections/ExpensesHeader";
 import ExpenseSummaryCards from "@/components/expenses/sections/ExpenseSummaryCards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { readCookieJson, writeCookieJson } from "@/src/lib/client-cookies";
+import {
+  invalidateFinanceSnapshotQuery,
+  useFinanceSnapshotQuery,
+} from "@/src/lib/queries/finance";
 import { useTelegramRealtimeRefresh } from "@/src/lib/realtime/useTelegramRealtimeRefresh";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Plus } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -371,11 +376,8 @@ function getApiErrorMessage(error: unknown, fallback: string) {
 export default function ExpensesMain() {
   const prefersReducedMotion = useReducedMotion();
   const variants = getSectionVariants(Boolean(prefersReducedMotion));
-
-  const [accounts, setAccounts] = useState<ExpenseAccount[]>([]);
-  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const queryClient = useQueryClient();
+  const financeSnapshotQuery = useFinanceSnapshotQuery();
   const [hasRestoredFilters, setHasRestoredFilters] = useState(false);
   const [filters, setFilters] = useState<ExpenseFilterState>(() => ({
     ...expenseFilterDefaults,
@@ -384,58 +386,58 @@ export default function ExpensesMain() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
 
+  const { accounts, expenses } = useMemo(() => {
+    const snapshot = financeSnapshotQuery.data;
+    if (!snapshot) {
+      return { accounts: [] as ExpenseAccount[], expenses: [] as ExpenseItem[] };
+    }
+
+    const mappedAccounts = snapshot.cards
+      .filter((card) => card.isActive)
+      .map(mapAccount);
+    const accountNameById = new Map(
+      mappedAccounts.map((account) => [account.id, account.name] as const),
+    );
+    const mappedTransactions = snapshot.transactions.map((item) =>
+      mapTransaction(item, accountNameById),
+    );
+
+    return {
+      accounts: mappedAccounts,
+      expenses: mappedTransactions,
+    };
+  }, [financeSnapshotQuery.data]);
+
+  const isLoading = financeSnapshotQuery.isLoading;
+  const isRefreshing = financeSnapshotQuery.isFetching && !financeSnapshotQuery.isLoading;
+
   const editingExpense = useMemo(
     () => expenses.find((expense) => expense.id === editingExpenseId) ?? null,
     [editingExpenseId, expenses],
   );
 
-  const loadFinanceData = useCallback(async (asRefresh = false) => {
-    if (asRefresh) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
+  useEffect(() => {
+    if (!financeSnapshotQuery.isError) {
+      return;
     }
 
-    try {
-      const [cardsResponse, transactionsResponse] = await Promise.all([
-        readApiJson<{ items: ApiCardDto[] }>("/api/cards"),
-        readApiJson<{ items: ApiTransactionDto[] }>("/api/transactions"),
-      ]);
-
-      const mappedAccounts = cardsResponse.items.map(mapAccount);
-      const accountNameById = new Map(
-        mappedAccounts.map((account) => [account.id, account.name] as const),
-      );
-      const mappedTransactions = transactionsResponse.items.map((item) =>
-        mapTransaction(item, accountNameById),
-      );
-
-      setAccounts(mappedAccounts);
-      setExpenses(mappedTransactions);
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Não foi possível carregar suas transações."));
-    } finally {
-      if (asRefresh) {
-        setIsRefreshing(false);
-      } else {
-        setIsLoading(false);
-      }
-    }
-  }, []);
+    toast.error(getApiErrorMessage(financeSnapshotQuery.error, "Não foi possível carregar suas transações."));
+  }, [
+    financeSnapshotQuery.error,
+    financeSnapshotQuery.errorUpdatedAt,
+    financeSnapshotQuery.isError,
+  ]);
 
   const handleRealtimeRefresh = useCallback(async () => {
-    await loadFinanceData(true);
-  }, [loadFinanceData]);
+    await invalidateFinanceSnapshotQuery(queryClient);
+  }, [queryClient]);
 
   useTelegramRealtimeRefresh({
     onRefresh: handleRealtimeRefresh,
     toastMessage: "Nova despesa via Telegram.",
   });
 
-  useEffect(() => {
-    void loadFinanceData();
-  }, [loadFinanceData]);
-
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const defaults: ExpenseFilterState = {
       ...expenseFilterDefaults,
@@ -490,6 +492,7 @@ export default function ExpensesMain() {
       setFilters((previous) => ({ ...previous, card: "all" }));
     }
   }, [accounts, filters.card, isLoading]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const statusOptions = useMemo(
     () => [
@@ -630,7 +633,7 @@ export default function ExpensesMain() {
         },
       );
 
-      await loadFinanceData(true);
+      await invalidateFinanceSnapshotQuery(queryClient);
 
       if (response.items.length > 1) {
         toast.success(`${response.items.length} parcelas adicionadas com sucesso.`);
@@ -661,7 +664,7 @@ export default function ExpensesMain() {
         },
       );
 
-      await loadFinanceData(true);
+      await invalidateFinanceSnapshotQuery(queryClient);
       toast.success(
         result.appliedScope === "series"
           ? "Série atualizada com sucesso."
@@ -682,7 +685,7 @@ export default function ExpensesMain() {
         },
       );
 
-      await loadFinanceData(true);
+      await invalidateFinanceSnapshotQuery(queryClient);
       toast.success(
         result.appliedScope === "series"
           ? "Série excluída com sucesso."

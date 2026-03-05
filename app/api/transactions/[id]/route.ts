@@ -5,6 +5,7 @@ import {
   updateTransactionsForUser,
 } from "@/src/server/finance/transactions-service";
 import { assertObjectPayload, handleFinanceHttpError } from "@/src/server/finance/http";
+import { invalidateFinanceCacheForUser } from "@/src/server/finance/read-cache";
 import type { ApiScope, UpdateTransactionInput } from "@/src/server/finance/types";
 
 type RouteContext = {
@@ -44,6 +45,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     };
 
     const result = await updateTransactionsForUser(userOrRedirect.id, id, scope, input);
+    invalidateFinanceCacheForUser(userOrRedirect.id);
     return NextResponse.json(result);
   } catch (error) {
     return handleFinanceHttpError(error);
@@ -63,6 +65,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const scope = parseScope(request.nextUrl.searchParams);
     const result = await deleteTransactionsForUser(userOrRedirect.id, id, scope);
+    invalidateFinanceCacheForUser(userOrRedirect.id);
     return NextResponse.json(result);
   } catch (error) {
     return handleFinanceHttpError(error);

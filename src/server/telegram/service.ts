@@ -3,6 +3,7 @@ import { listCardsForUser } from "@/src/server/finance/cards-service";
 import { FinanceError } from "@/src/server/finance/errors";
 import { createTransactionsForUser } from "@/src/server/finance/transactions-service";
 import { ALLOWED_CATEGORIES } from "@/src/server/finance/validators";
+import { invalidateFinanceCacheForUser } from "@/src/server/finance/read-cache";
 import { publishTelegramTransactionCreatedEvent } from "@/src/server/realtime/publish-telegram-event";
 import { parseTelegramExpenseMessage } from "@/src/server/telegram/parser";
 import type {
@@ -589,6 +590,7 @@ export async function handleTelegramWebhookUpdate(
 
     const createdItem = created.items[0];
     if (createdItem) {
+      invalidateFinanceCacheForUser(linkedUser.userId);
       void publishTelegramTransactionCreatedEvent({
         source: "telegram",
         userId: linkedUser.userId,

@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUserFromRequest } from "@/src/lib/auth-guards";
 import {
   createTransactionsForUser,
-  listTransactionsForUser,
 } from "@/src/server/finance/transactions-service";
 import { assertObjectPayload, handleFinanceHttpError } from "@/src/server/finance/http";
+import {
+  getCachedTransactionsForUser,
+  invalidateFinanceCacheForUser,
+} from "@/src/server/finance/read-cache";
 import type {
   CreateTransactionInput,
   TransactionsFilters,
@@ -35,7 +38,7 @@ export async function GET(request: NextRequest) {
       return userOrRedirect;
     }
 
-    const { items, summary } = await listTransactionsForUser(
+    const { items, summary } = await getCachedTransactionsForUser(
       userOrRedirect.id,
       parseFilters(request.nextUrl.searchParams),
     );
@@ -75,6 +78,7 @@ export async function POST(request: NextRequest) {
     };
 
     const result = await createTransactionsForUser(userOrRedirect.id, input);
+    invalidateFinanceCacheForUser(userOrRedirect.id);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     return handleFinanceHttpError(error);

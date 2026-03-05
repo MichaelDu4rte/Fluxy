@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import {
   computeAvailableCents,
   getCardMetrics,
+  getCardMetricsForAccounts,
   getSettledTotalsForAccount,
   type AccountBalanceSeed,
 } from "@/src/server/finance/balance-service";
@@ -166,11 +167,24 @@ export async function listCardsForUser(
     orderBy: { createdAt: "asc" },
   });
 
-  return Promise.all(
-    accounts.map(async (account) =>
-      toCardDto(account, await getCardMetrics(prisma, userId, account)),
-    ),
-  );
+  const metricsByAccount = await getCardMetricsForAccounts(prisma, userId, accounts);
+
+  return accounts.map((account) => {
+    const metrics = metricsByAccount.get(account.id);
+    return toCardDto(
+      account,
+      metrics ?? {
+        availableCents:
+          account.type === FinancialAccountType.CREDIT
+            ? account.creditLimitCents ?? 0
+            : account.initialBalanceCents,
+        incomeTotalCents: 0,
+        expenseTotalCents: 0,
+        creditUsedCents: 0,
+        utilizationPct: 0,
+      },
+    );
+  });
 }
 
 export async function createCardForUser(

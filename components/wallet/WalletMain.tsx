@@ -18,7 +18,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, getTypeLabel } from "@/components/wallet/wallet-helpers";
+import {
+  invalidateFinanceSnapshotQuery,
+  useFinanceSnapshotQuery,
+} from "@/src/lib/queries/finance";
 import { useTelegramRealtimeRefresh } from "@/src/lib/realtime/useTelegramRealtimeRefresh";
+import { useQueryClient } from "@tanstack/react-query";
 import type {
   CardDto,
   CreateCardPayload,
@@ -62,6 +67,9 @@ type AccountFlow = {
   currentNetMonthCents: number;
   previousNetMonthCents: number;
 };
+
+const EMPTY_CARDS: CardDto[] = [];
+const EMPTY_TRANSACTIONS: TransactionDto[] = [];
 
 function normalizeText(value: string) {
   return value
@@ -120,11 +128,13 @@ async function readApiJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export default function WalletMain() {
-  const [cards, setCards] = useState<CardDto[]>([]);
-  const [transactions, setTransactions] = useState<TransactionDto[]>([]);
+  const queryClient = useQueryClient();
+  const financeSnapshotQuery = useFinanceSnapshotQuery();
+  const cards = financeSnapshotQuery.data?.cards ?? EMPTY_CARDS;
+  const transactions = financeSnapshotQuery.data?.transactions ?? EMPTY_TRANSACTIONS;
   const [marketQuotesByAssetId, setMarketQuotesByAssetId] = useState<Record<string, CryptoQuoteDto>>({});
 
-  const [isLoading, setIsLoading] = useState(true);
+  const isLoading = financeSnapshotQuery.isLoading;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -140,14 +150,8 @@ export default function WalletMain() {
   const [deleteCandidate, setDeleteCandidate] = useState<CardDto | null>(null);
 
   const refreshData = useCallback(async () => {
-    const [cardsResponse, transactionsResponse] = await Promise.all([
-      readApiJson<{ items: CardDto[] }>("/api/cards?status=all"),
-      readApiJson<{ items: TransactionDto[] }>("/api/transactions"),
-    ]);
-
-    setCards(cardsResponse.items);
-    setTransactions(transactionsResponse.items);
-  }, []);
+    await invalidateFinanceSnapshotQuery(queryClient);
+  }, [queryClient]);
 
   const handleRealtimeRefresh = useCallback(async () => {
     await refreshData();
@@ -159,34 +163,19 @@ export default function WalletMain() {
   });
 
   useEffect(() => {
-    let mounted = true;
+    if (!financeSnapshotQuery.isError) {
+      return;
+    }
 
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        await refreshData();
-      } catch (error) {
-        if (!mounted) {
-          return;
-        }
-        const message =
-          error instanceof ApiRequestError
-            ? error.message
-            : "Não foi possível carregar a carteira.";
-        toast.error(message);
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      mounted = false;
-    };
-  }, [refreshData]);
+    const message = financeSnapshotQuery.error instanceof Error
+      ? financeSnapshotQuery.error.message
+      : "Não foi possível carregar a carteira.";
+    toast.error(message);
+  }, [
+    financeSnapshotQuery.error,
+    financeSnapshotQuery.errorUpdatedAt,
+    financeSnapshotQuery.isError,
+  ]);
 
   useEffect(() => {
     const investmentAssetIds = [...new Set(
@@ -741,3 +730,4 @@ export default function WalletMain() {
     </main>
   );
 }
+

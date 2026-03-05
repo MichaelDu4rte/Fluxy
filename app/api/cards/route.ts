@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUserFromRequest } from "@/src/lib/auth-guards";
-import {
-  createCardForUser,
-  listCardsForUser,
-} from "@/src/server/finance/cards-service";
+import { createCardForUser } from "@/src/server/finance/cards-service";
 import { handleFinanceHttpError, assertObjectPayload } from "@/src/server/finance/http";
+import {
+  getCachedCardsForUser,
+  invalidateFinanceCacheForUser,
+} from "@/src/server/finance/read-cache";
 import type { CreateCardInput } from "@/src/server/finance/types";
 
 export async function GET(request: NextRequest) {
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
         ? statusParam
         : "active";
 
-    const items = await listCardsForUser(userOrRedirect.id, statusFilter);
+    const items = await getCachedCardsForUser(userOrRedirect.id, statusFilter);
     return NextResponse.json({ items });
   } catch (error) {
     return handleFinanceHttpError(error);
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest) {
     };
 
     const item = await createCardForUser(userOrRedirect.id, input);
+    invalidateFinanceCacheForUser(userOrRedirect.id);
     return NextResponse.json({ item }, { status: 201 });
   } catch (error) {
     return handleFinanceHttpError(error);
