@@ -49,6 +49,16 @@ TELEGRAM_WEBHOOK_SECRET=<random shared secret>
 TELEGRAM_BOT_USERNAME=<optional bot username without @>
 ```
 
+### Database migration on deploy
+
+This integration needs the Telegram tables in production. Run migrations before serving traffic:
+
+```bash
+npx prisma migrate deploy
+```
+
+If you use Supabase connection pooling (`pooler.supabase.com:6543`) in `DATABASE_URL`, configure `DIRECT_URL` with a direct/session connection (`:5432`) for Prisma CLI commands.
+
 ### Webhook setup
 
 After deploy, register the webhook:
