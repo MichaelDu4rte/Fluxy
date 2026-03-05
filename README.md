@@ -74,9 +74,74 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 1. Open `/integracoes/telegram` in the app.
 2. Generate a linking code.
 3. Send `/vincular CODIGO` to the bot in a private chat.
-4. Send expenses in this format:
+4. Optional commands:
+   - `/cartoes` to list active account/card names.
+   - `/categorias` to list accepted categories.
+5. Send expenses in this format:
 
 ```text
-titulo, descricao, valor, cartao, categoria, status, data
-Mercado, Coca, 8,00, Cartao, alimentacao, pago, 2026-03-04
+titulo, descricao, valor, cartao[, categoria[, status[, data]]]
+Mercado, Coca, 8,00, Cartao
+Mercado, Coca, 8,00, Cartao, alimentacao, pago, 05/03/2026
 ```
+
+Defaults when omitted:
+- `categoria`: `outros`
+- `status`: `pago`
+- `data`: current date in `America/Sao_Paulo`
+
+Accepted date input:
+- `DD/MM/AAAA` (recommended)
+- `YYYY-MM-DD` (legacy compatibility)
+
+## Realtime (Socket.IO + Telegram)
+
+This project supports realtime refresh when a Telegram expense is created.
+
+Architecture:
+- Next.js app (Vercel): issues socket auth token and publishes Telegram-created events.
+- Separate Socket.IO service: authenticates users by JWT, isolates rooms by `user:{userId}`, emits realtime updates.
+
+### Realtime environment variables (Next app)
+
+Set these in local `.env` and production:
+
+```bash
+NEXT_PUBLIC_REALTIME_SOCKET_URL=http://localhost:4001
+REALTIME_EVENTS_INGEST_URL=http://localhost:4001
+REALTIME_EVENTS_SECRET=<shared-secret>
+REALTIME_JWT_SECRET=<jwt-secret>
+REALTIME_TOKEN_TTL_SECONDS=900
+```
+
+### Realtime environment variables (Socket service)
+
+Set these in the Socket service runtime:
+
+```bash
+PORT=4001
+REALTIME_ALLOWED_ORIGINS=http://localhost:3000
+REALTIME_EVENTS_SECRET=<same-shared-secret>
+REALTIME_JWT_SECRET=<same-jwt-secret>
+```
+
+`REALTIME_ALLOWED_ORIGINS` accepts comma-separated origins.
+
+### Local development
+
+Run in two terminals:
+
+```bash
+npm run dev
+```
+
+```bash
+npm run realtime:dev
+```
+
+### Endpoints/events
+
+- Next token endpoint: `GET /api/realtime/socket-token`
+- Socket internal ingest: `POST /internal/events/telegram-transaction-created`
+- Socket healthcheck: `GET /healthz`
+- Client event: `finance:telegram_transaction_created`

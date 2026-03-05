@@ -231,24 +231,30 @@ export default function TelegramIntegrationMain() {
         <section className="rounded-3xl border border-[#e9e4da] bg-white/90 p-5 shadow-sm sm:p-6">
           <h2 className="text-lg font-semibold text-[#171611]">Como usar</h2>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-[#5f5745]">
-            <li>Clique em "Gerar codigo".</li>
+            <li>Clique em &quot;Gerar codigo&quot;.</li>
             <li>No Telegram, envie ao bot: <code className="rounded bg-[#f3efe4] px-1.5 py-0.5">/vincular CODIGO</code>.</li>
+            <li>Use <code className="rounded bg-[#f3efe4] px-1.5 py-0.5">/cartoes</code> para ver os nomes das contas/cartoes ativos.</li>
+            <li>Use <code className="rounded bg-[#f3efe4] px-1.5 py-0.5">/categorias</code> para ver categorias aceitas.</li>
             <li>Depois envie despesas no formato abaixo.</li>
           </ol>
 
           <div className="mt-4 rounded-2xl border border-[#ece6da] bg-[#faf8f3] p-4 text-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8f8771]">
-              Formato obrigatorio
+              Formato flexivel
             </p>
             <pre className="mt-2 overflow-x-auto rounded-lg bg-white p-3 font-mono text-xs text-[#3f382b]">
-{`titulo, descricao, valor, cartao, categoria, status, data
-Mercado, Coca, 8,00, Cartao, alimentacao, pago, 2026-03-04`}
+{`titulo, descricao, valor, cartao[, categoria[, status[, data]]]
+Mercado, Coca, 8,00, Cartao
+Mercado, Coca, 8,00, Cartao, alimentacao, pago, 05/03/2026`}
             </pre>
             <p className="mt-2 text-xs text-[#7f7763]">
+              Defaults quando nao informar: categoria = outros, status = pago, data = hoje (America/Sao_Paulo).
+            </p>
+            <p className="mt-1 text-xs text-[#7f7763]">
               Categorias: moradia, alimentacao, transporte, assinaturas, lazer, saude, educacao, outros.
             </p>
             <p className="mt-1 text-xs text-[#7f7763]">
-              Status: pago, pendente, atrasado. Data: YYYY-MM-DD.
+              Status: pago, pendente, atrasado. Data: DD/MM/AAAA (recomendado) ou YYYY-MM-DD.
             </p>
           </div>
         </section>

@@ -27,9 +27,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { readCookieJson, writeCookieJson } from "@/src/lib/client-cookies";
+import { useTelegramRealtimeRefresh } from "@/src/lib/realtime/useTelegramRealtimeRefresh";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { CalendarRange, ChevronDown, SlidersHorizontal } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const enterEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -703,49 +704,59 @@ export default function DashboardMain() {
   const [isLoading, setIsLoading] = useState(true);
   const [cardsData, setCardsData] = useState<ApiCardDto[]>([]);
   const [transactionsData, setTransactionsData] = useState<DashboardTransaction[]>([]);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadDashboardData = async () => {
-      try {
-        const [cardsResponse, transactionsResponse] = await Promise.all([
-          readApiJson<{ items: ApiCardDto[] }>("/api/cards"),
-          readApiJson<{ items: ApiTransactionDto[] }>("/api/transactions"),
-        ]);
-
-        if (!isMounted) {
-          return;
-        }
-
-        const cards = cardsResponse.items;
-        const transactions = mapTransactions(transactionsResponse.items);
-
-        setCardsData(cards);
-        setTransactionsData(transactions);
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        const message =
-          error instanceof ApiRequestError
-            ? error.message
-            : "Não foi possível carregar os dados reais do dashboard.";
-        toast.error(message);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void loadDashboardData();
-
     return () => {
-      isMounted = false;
+      mountedRef.current = false;
     };
   }, []);
+
+  const loadDashboardData = useCallback(async () => {
+    try {
+      const [cardsResponse, transactionsResponse] = await Promise.all([
+        readApiJson<{ items: ApiCardDto[] }>("/api/cards"),
+        readApiJson<{ items: ApiTransactionDto[] }>("/api/transactions"),
+      ]);
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      const cards = cardsResponse.items;
+      const transactions = mapTransactions(transactionsResponse.items);
+
+      setCardsData(cards);
+      setTransactionsData(transactions);
+    } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      const message =
+        error instanceof ApiRequestError
+          ? error.message
+          : "Não foi possível carregar os dados reais do dashboard.";
+      toast.error(message);
+    } finally {
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
+
+  const handleRealtimeRefresh = useCallback(async () => {
+    await loadDashboardData();
+  }, [loadDashboardData]);
+
+  useTelegramRealtimeRefresh({
+    onRefresh: handleRealtimeRefresh,
+    toastMessage: "Nova despesa via Telegram.",
+  });
+
+  useEffect(() => {
+    void loadDashboardData();
+  }, [loadDashboardData]);
 
   useEffect(() => {
     const defaults = {

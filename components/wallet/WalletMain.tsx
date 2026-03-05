@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, getTypeLabel } from "@/components/wallet/wallet-helpers";
+import { useTelegramRealtimeRefresh } from "@/src/lib/realtime/useTelegramRealtimeRefresh";
 import type {
   CardDto,
   CreateCardPayload,
@@ -147,6 +148,15 @@ export default function WalletMain() {
     setCards(cardsResponse.items);
     setTransactions(transactionsResponse.items);
   }, []);
+
+  const handleRealtimeRefresh = useCallback(async () => {
+    await refreshData();
+  }, [refreshData]);
+
+  useTelegramRealtimeRefresh({
+    onRefresh: handleRealtimeRefresh,
+    toastMessage: "Nova despesa via Telegram.",
+  });
 
   useEffect(() => {
     let mounted = true;

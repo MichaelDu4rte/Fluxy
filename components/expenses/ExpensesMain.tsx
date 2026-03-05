@@ -26,6 +26,7 @@ import ExpensesHeader from "@/components/expenses/sections/ExpensesHeader";
 import ExpenseSummaryCards from "@/components/expenses/sections/ExpenseSummaryCards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { readCookieJson, writeCookieJson } from "@/src/lib/client-cookies";
+import { useTelegramRealtimeRefresh } from "@/src/lib/realtime/useTelegramRealtimeRefresh";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Plus } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -421,6 +422,15 @@ export default function ExpensesMain() {
       }
     }
   }, []);
+
+  const handleRealtimeRefresh = useCallback(async () => {
+    await loadFinanceData(true);
+  }, [loadFinanceData]);
+
+  useTelegramRealtimeRefresh({
+    onRefresh: handleRealtimeRefresh,
+    toastMessage: "Nova despesa via Telegram.",
+  });
 
   useEffect(() => {
     void loadFinanceData();

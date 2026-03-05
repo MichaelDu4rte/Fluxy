@@ -21,6 +21,14 @@ function normalizeConnectionStringForPg(rawConnectionString: string): string {
   return parsedUrl.toString();
 }
 
+function isLocalDatabaseHost(hostname: string): boolean {
+  return (
+    hostname === "localhost"
+    || hostname === "127.0.0.1"
+    || hostname === "::1"
+  );
+}
+
 function resolveRejectUnauthorized(connectionUrl: URL): boolean {
   const envValue = process.env.PG_SSL_REJECT_UNAUTHORIZED;
 
@@ -40,13 +48,34 @@ function resolveRejectUnauthorized(connectionUrl: URL): boolean {
   return process.env.NODE_ENV === "production";
 }
 
+function resolveSslConfig(connectionUrl: URL): boolean | { rejectUnauthorized: boolean } {
+  const pgSslEnv = process.env.PG_SSL?.trim().toLowerCase();
+  if (pgSslEnv === "true") {
+    return { rejectUnauthorized: resolveRejectUnauthorized(connectionUrl) };
+  }
+  if (pgSslEnv === "false") {
+    return false;
+  }
+
+  const sslMode = connectionUrl.searchParams.get("sslmode")?.trim().toLowerCase();
+  if (sslMode === "disable") {
+    return false;
+  }
+
+  if (isLocalDatabaseHost(connectionUrl.hostname)) {
+    return false;
+  }
+
+  return { rejectUnauthorized: resolveRejectUnauthorized(connectionUrl) };
+}
+
 const normalizedConnectionString = normalizeConnectionStringForPg(connectionString);
 const connectionUrl = new URL(normalizedConnectionString);
-const shouldRejectUnauthorized = resolveRejectUnauthorized(connectionUrl);
+const sslConfig = resolveSslConfig(connectionUrl);
 
 const pool = new Pool({
   connectionString: connectionUrl.toString(),
-  ssl: { rejectUnauthorized: shouldRejectUnauthorized },
+  ssl: sslConfig,
 });
 
 const adapter = new PrismaPg(pool);

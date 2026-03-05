@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import { listCardsForUser } from "@/src/server/finance/cards-service";
 import { FinanceError } from "@/src/server/finance/errors";
 import { createTransactionsForUser } from "@/src/server/finance/transactions-service";
+import { ALLOWED_CATEGORIES } from "@/src/server/finance/validators";
+import { publishTelegramTransactionCreatedEvent } from "@/src/server/realtime/publish-telegram-event";
 import { parseTelegramExpenseMessage } from "@/src/server/telegram/parser";
 import type {
   GenerateTelegramLinkCodeResponseDto,
@@ -13,8 +16,12 @@ import type {
 const LINK_CODE_TTL_SECONDS = 10 * 60;
 const LINK_CODE_SIZE = 8;
 const LINK_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const TELEGRAM_FORMAT_GUIDE =
+  "titulo, descricao, valor, cartao[, categoria[, status[, data]]]";
 const TELEGRAM_FORMAT_EXAMPLE =
-  "Mercado, Coca, 8,00, Cartao, alimentacao, pago, 2026-03-04";
+  "Mercado, Coca, 8,00, Cartao, alimentacao, pago, 05/03/2026";
+const TELEGRAM_FORMAT_EXAMPLE_MIN = "Mercado, Coca, 8,00, Cartao";
+const UNLINKED_CHAT_MESSAGE = "Chat nao vinculado. Gere um codigo no Fluxy e envie: /vincular CODIGO";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -57,6 +64,16 @@ function getTelegramBotToken(): string {
     );
   }
   return token;
+}
+
+function normalizeTelegramBotUsername(raw: string | undefined): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = trimmed.replace(/^@+/, "");
+  return normalized || null;
 }
 
 async function sendTelegramMessage(chatId: bigint, text: string): Promise<void> {
@@ -105,6 +122,84 @@ function parseLinkCommand(text: string): { code: string } | null {
   }
 
   return { code: normalizeLinkCode(match[1]) };
+}
+
+function isStartCommand(text: string): boolean {
+  return /^\/(?:start|help)(?:@[A-Za-z0-9_]+)?$/i.test(text.trim());
+}
+
+function isCategoriesCommand(text: string): boolean {
+  return /^\/categorias(?:@[A-Za-z0-9_]+)?$/i.test(text.trim());
+}
+
+function isCardsCommand(text: string): boolean {
+  return /^\/cartoes(?:@[A-Za-z0-9_]+)?$/i.test(text.trim());
+}
+
+function formatCardType(type: "credit" | "debit" | "investment"): string {
+  if (type === "credit") {
+    return "Credito";
+  }
+  if (type === "debit") {
+    return "Debito";
+  }
+  return "Investimento";
+}
+
+function getTelegramStartMessage(): string {
+  return [
+    "Fluxy Telegram ativo.",
+    "Para conectar: /vincular CODIGO",
+    `Formato: ${TELEGRAM_FORMAT_GUIDE}`,
+    `Exemplo completo: ${TELEGRAM_FORMAT_EXAMPLE}`,
+    `Exemplo rapido: ${TELEGRAM_FORMAT_EXAMPLE_MIN}`,
+    "Comandos: /categorias e /cartoes",
+  ].join("\n");
+}
+
+function getCategoriesMessage(): string {
+  return [
+    `Categorias disponiveis: ${ALLOWED_CATEGORIES.join(", ")}.`,
+    "Se nao informar categoria, sera usado: outros.",
+  ].join("\n");
+}
+
+async function getActiveCardsMessage(userId: string): Promise<string> {
+  const cards = await listCardsForUser(userId, "active");
+  if (cards.length === 0) {
+    return "Nenhum cartao/conta ativo encontrado.";
+  }
+
+  const lines = cards.map((card, index) =>
+    `${index + 1}. ${card.name} (${formatCardType(card.type)})`
+  );
+
+  return [
+    "Cartoes/contas ativos:",
+    ...lines,
+    "",
+    "Use exatamente o nome no campo cartao.",
+    `Exemplo rapido: ${TELEGRAM_FORMAT_EXAMPLE_MIN}`,
+  ].join("\n");
+}
+
+function getLinkedSuccessMessage(): string {
+  return [
+    "Vinculacao concluida.",
+    `Formato: ${TELEGRAM_FORMAT_GUIDE}`,
+    `Exemplo completo: ${TELEGRAM_FORMAT_EXAMPLE}`,
+    `Exemplo rapido: ${TELEGRAM_FORMAT_EXAMPLE_MIN}`,
+    "Comandos: /categorias e /cartoes",
+  ].join("\n");
+}
+
+function getTelegramParseHintMessage(errorMessage: string): string {
+  return [
+    errorMessage,
+    `Formato: ${TELEGRAM_FORMAT_GUIDE}`,
+    `Exemplo completo: ${TELEGRAM_FORMAT_EXAMPLE}`,
+    `Exemplo rapido: ${TELEGRAM_FORMAT_EXAMPLE_MIN}`,
+  ].join("\n");
 }
 
 async function registerUpdateLog(updateId: bigint, chatId: bigint | null): Promise<boolean> {
@@ -211,7 +306,7 @@ export async function getTelegramLinkStatus(userId: string): Promise<TelegramLin
         ),
       }
       : null,
-    botUsername: process.env.TELEGRAM_BOT_USERNAME?.trim() || null,
+    botUsername: normalizeTelegramBotUsername(process.env.TELEGRAM_BOT_USERNAME),
     formatExample: TELEGRAM_FORMAT_EXAMPLE,
   };
 }
@@ -407,6 +502,16 @@ export async function handleTelegramWebhookUpdate(
     return "invalid";
   }
 
+  if (isStartCommand(text)) {
+    await sendTelegramMessage(chatId, getTelegramStartMessage());
+    return "ignored";
+  }
+
+  if (isCategoriesCommand(text)) {
+    await sendTelegramMessage(chatId, getCategoriesMessage());
+    return "ignored";
+  }
+
   if (text.startsWith("/vincular")) {
     const command = parseLinkCommand(text);
 
@@ -417,10 +522,7 @@ export async function handleTelegramWebhookUpdate(
 
     try {
       await linkTelegramChatByCode(message.chat, command.code);
-      await sendTelegramMessage(
-        chatId,
-        "Vinculacao concluida. Agora envie despesas no formato: titulo, descricao, valor, cartao, categoria, status, data",
-      );
+      await sendTelegramMessage(chatId, getLinkedSuccessMessage());
       return "linked";
     } catch (error) {
       await sendTelegramMessage(chatId, getTelegramErrorMessage(error));
@@ -429,11 +531,19 @@ export async function handleTelegramWebhookUpdate(
   }
 
   const linkedUser = await resolveLinkedUserByChat(chatId);
+  if (isCardsCommand(text)) {
+    if (!linkedUser) {
+      await sendTelegramMessage(chatId, UNLINKED_CHAT_MESSAGE);
+      return "invalid";
+    }
+
+    const cardsMessage = await getActiveCardsMessage(linkedUser.userId);
+    await sendTelegramMessage(chatId, cardsMessage);
+    return "ignored";
+  }
+
   if (!linkedUser) {
-    await sendTelegramMessage(
-      chatId,
-      "Chat nao vinculado. Gere um codigo no Fluxy e envie: /vincular CODIGO",
-    );
+    await sendTelegramMessage(chatId, UNLINKED_CHAT_MESSAGE);
     return "invalid";
   }
 
@@ -462,7 +572,7 @@ export async function handleTelegramWebhookUpdate(
       );
     }
 
-    await createTransactionsForUser(linkedUser.userId, {
+    const created = await createTransactionsForUser(linkedUser.userId, {
       accountId: account.id,
       kind: "expense",
       status: parsed.status,
@@ -477,6 +587,20 @@ export async function handleTelegramWebhookUpdate(
       isRecurring: false,
     });
 
+    const createdItem = created.items[0];
+    if (createdItem) {
+      void publishTelegramTransactionCreatedEvent({
+        source: "telegram",
+        userId: linkedUser.userId,
+        transactionId: createdItem.id,
+        accountId: createdItem.accountId,
+        merchant: createdItem.merchant,
+        amountCents: createdItem.amountCents,
+        occurredAt: createdItem.occurredAt.slice(0, 10),
+        createdAt: createdItem.createdAt,
+      });
+    }
+
     await touchTelegramActivity(linkedUser.userId);
 
     await sendTelegramMessage(
@@ -486,10 +610,7 @@ export async function handleTelegramWebhookUpdate(
 
     return "created";
   } catch (error) {
-    await sendTelegramMessage(
-      chatId,
-      `${getTelegramErrorMessage(error)}\nExemplo: ${TELEGRAM_FORMAT_EXAMPLE}`,
-    );
+    await sendTelegramMessage(chatId, getTelegramParseHintMessage(getTelegramErrorMessage(error)));
     return "invalid";
   }
 }
